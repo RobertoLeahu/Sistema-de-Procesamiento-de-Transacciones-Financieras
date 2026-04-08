@@ -21,6 +21,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/*
+ * Entidad central que gestiona el saldo y el estado de un producto financiero.
+ */
+
 @Entity
 @Table(name = "cuentas")
 @Data

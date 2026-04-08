@@ -21,6 +21,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/*
+ * Registro histórico e inmutable de un movimiento financiero entre cuentas.
+ */
+
 @Entity
 @Table(name = "transacciones")
 @Data

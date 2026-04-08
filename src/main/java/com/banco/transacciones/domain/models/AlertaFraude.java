@@ -17,6 +17,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Entidad que registra las alertas de posibles fraudes detectadas por el sistema.
+ */
+
 @Entity
 @Table(name = "alertas_fraude")
 @Data

@@ -16,6 +16,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Entidad que representa a un titular de servicios en la plataforma financiera.
+ */
+
 @Entity
 @Table(name = "clientes")
 @Data
@@ -37,5 +41,5 @@ public class Cliente {
     private LocalDate fechaAlta;
 
     @OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL)
-    private List<Cuenta> cuentas; // Relación 1:* 
+    private List<Cuenta> cuentas;
 }
