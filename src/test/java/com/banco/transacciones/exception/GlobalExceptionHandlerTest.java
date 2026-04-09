@@ -39,7 +39,14 @@ class GlobalExceptionHandlerTest {
 	@DisplayName("Debe retornar 403 cuando la cuenta esté bloqueada")
 	void testHandleCuentabloqueada() throws Exception {
 		mockMvc.perform(get("/test/cuenta-bloqueada")).andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.status", is(403)))
-				.andExpect(jsonPath("$.error", is("Cuenta bloqueada")));
+				.andExpect(jsonPath("$.status", is(403))).andExpect(jsonPath("$.error", is("Cuenta bloqueada")));
+	}
+
+	@Test
+	@DisplayName("Debe retornar 404 cuando no se encuentre la transacción buscada")
+	void testHandleTransaccionNotFound() throws Exception {
+		mockMvc.perform(get("/test/not-found")).andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.status", is(404)))
+				.andExpect(jsonPath("$.error", is("Transacción no encontrada")));
 	}
 }

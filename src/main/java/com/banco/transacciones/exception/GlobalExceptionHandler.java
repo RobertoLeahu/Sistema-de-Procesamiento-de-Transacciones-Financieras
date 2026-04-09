@@ -34,6 +34,13 @@ public class GlobalExceptionHandler {
 		return buildResponse(HttpStatus.FORBIDDEN, "Cuenta bloqueada", ex.getMessage(), request);
 	}
 
+	@ExceptionHandler(TransaccionNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleTransaccionNotFoundException(TransaccionNotFoundException ex,
+			HttpServletRequest request) {
+		// Retorna 404 Not Found
+		return buildResponse(HttpStatus.NOT_FOUND, "Transacción no encontrada", ex.getMessage(), request);
+	}
+
 	/**
 	 * Método auxiliar para construir la respuesta JSON estandarizada.
 	 */
