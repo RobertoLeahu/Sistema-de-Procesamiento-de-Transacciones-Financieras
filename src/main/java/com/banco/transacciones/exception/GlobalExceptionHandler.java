@@ -41,6 +41,14 @@ public class GlobalExceptionHandler {
 		return buildResponse(HttpStatus.NOT_FOUND, "Transacción no encontrada", ex.getMessage(), request);
 	}
 
+	@ExceptionHandler(ConcurrencyFailureException.class)
+	public ResponseEntity<ErrorResponse> handleConcurrencyFailureException(ConcurrencyFailureException ex,
+			HttpServletRequest request) {
+		// Retorna 409 Conflict
+		return buildResponse(HttpStatus.CONFLICT, "Conflicto de concurrencia",
+				"La cuenta está siendo procesada por otra transacción. Intente de nuevo.", request);
+	}
+
 	/**
 	 * Método auxiliar para construir la respuesta JSON estandarizada.
 	 */

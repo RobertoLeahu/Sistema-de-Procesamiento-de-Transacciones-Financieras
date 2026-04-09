@@ -49,4 +49,12 @@ class GlobalExceptionHandlerTest {
 				.andExpect(jsonPath("$.status", is(404)))
 				.andExpect(jsonPath("$.error", is("Transacción no encontrada")));
 	}
+
+	@Test
+	@DisplayName("Debe retornar 409 cuando haya un conflictode concurrencia")
+	void testHandleConcurrencyFailureException() throws Exception {
+		mockMvc.perform(get("/test/concurrency")).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status", is(409)))
+				.andExpect(jsonPath("$.error", is("Conflicto de concurrencia")));
+	}
 }
