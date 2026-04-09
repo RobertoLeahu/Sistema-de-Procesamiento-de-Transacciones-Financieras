@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.banco.transacciones.exception.ConcurrencyFailureException;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
+import com.banco.transacciones.exception.GeneralException;
 import com.banco.transacciones.exception.SaldoInsuficienteException;
 import com.banco.transacciones.exception.TransaccionNotFoundException;
 
@@ -32,5 +33,10 @@ public class TestExceptionController {
 	@GetMapping("/test/concurrency")
 	public void throwConcurrency() {
 		throw new ConcurrencyFailureException("Hay un conflicto de concurrencia");
+	}
+
+	@GetMapping("/test/general-exception")
+	public void throwGeneralException() {
+		throw new GeneralException("Hay un error no controlado detectado");
 	}
 }

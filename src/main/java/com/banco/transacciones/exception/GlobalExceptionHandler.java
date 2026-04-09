@@ -49,6 +49,14 @@ public class GlobalExceptionHandler {
 				"La cuenta está siendo procesada por otra transacción. Intente de nuevo.", request);
 	}
 
+	@ExceptionHandler(Exception.class)
+	public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex, HttpServletRequest request) {
+		// Nivel error para fallos críticos no controlados
+		log.error("Error no controlado detectado: ", ex);
+		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
+				"Ocurrió un error inesperado en el servidor", request);
+	}
+
 	/**
 	 * Método auxiliar para construir la respuesta JSON estandarizada.
 	 */
