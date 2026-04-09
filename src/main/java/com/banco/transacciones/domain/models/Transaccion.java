@@ -32,24 +32,24 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class Transaccion {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    private String cuentaOrigen;
-    private String cuentaDestino;
-    private BigDecimal monto;
-    
-    @Enumerated(EnumType.STRING)
-    private TipoTransaccion tipo;
-    
-    @Enumerated(EnumType.STRING)
-    private EstadoTransaccion estado;
-    
-    private Instant fechaHora;
-    private String descripcion;
-    private Double riesgoFraude;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    @OneToMany(mappedBy = "transaccion", cascade = CascadeType.ALL)
-    private List<AlertaFraude> alertas;
+	private String cuentaOrigen;
+	private String cuentaDestino;
+	private BigDecimal monto;
+
+	@Enumerated(EnumType.STRING)
+	private TipoTransaccion tipo;
+
+	@Enumerated(EnumType.STRING)
+	private EstadoTransaccion estado;
+
+	private Instant fechaHora;
+	private String descripcion;
+	private Double riesgoFraude;
+
+	@OneToMany(mappedBy = "transaccion", cascade = CascadeType.ALL)
+	private List<AlertaFraude> alertas;
 }

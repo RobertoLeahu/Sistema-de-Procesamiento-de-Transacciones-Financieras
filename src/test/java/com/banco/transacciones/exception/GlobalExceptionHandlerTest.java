@@ -21,19 +21,25 @@ import com.banco.transacciones.controller.TestExceptionController;
 @Import(GlobalExceptionHandler.class)
 class GlobalExceptionHandlerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+	@Autowired
+	private MockMvc mockMvc;
 
-    @Test
-    @DisplayName("Debe retornar 400 cuando el saldo es insuficiente")
-    void testHandleSaldoInsuficiente() throws Exception {
-        mockMvc.perform(get("/test/saldo-insuficiente"))
-                .andExpect(status().isBadRequest()) // 400 Bad Request
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.timestamp", notNullValue()))
-                .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.error", is("Saldo insuficiente")))
-                .andExpect(jsonPath("$.detalle").value(is("La cuenta 0012-3456 no tiene saldo suficiente")))
-                .andExpect(jsonPath("$.path", is("/test/saldo-insuficiente")));
-    }
+	@Test
+	@DisplayName("Debe retornar 400 cuando el saldo es insuficiente")
+	void testHandleSaldoInsuficiente() throws Exception {
+		mockMvc.perform(get("/test/saldo-insuficiente")).andExpect(status().isBadRequest())
+				.andExpect(content().contentType(MediaType.APPLICATION_JSON))
+				.andExpect(jsonPath("$.timestamp", notNullValue())).andExpect(jsonPath("$.status", is(400)))
+				.andExpect(jsonPath("$.error", is("Saldo insuficiente")))
+				.andExpect(jsonPath("$.detalle").value(is("La cuenta 0012-3456 no tiene saldo suficiente")))
+				.andExpect(jsonPath("$.path", is("/test/saldo-insuficiente")));
+	}
+
+	@Test
+	@DisplayName("Debe retornar 403 cuando la cuenta esté bloqueada")
+	void testHandleCuentabloqueada() throws Exception {
+		mockMvc.perform(get("/test/cuenta-bloqueada")).andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.status", is(403)))
+				.andExpect(jsonPath("$.error", is("Cuenta bloqueada")));
+	}
 }

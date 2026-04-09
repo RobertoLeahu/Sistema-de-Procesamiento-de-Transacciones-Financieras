@@ -19,25 +19,29 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-	
+
 	@ExceptionHandler(SaldoInsuficienteException.class)
-    public ResponseEntity<ErrorResponse> handleSaldoInsuficiente(SaldoInsuficienteException ex, HttpServletRequest request) {
-        // Retorna 400 Bad Request
-        return buildResponse(HttpStatus.BAD_REQUEST, "Saldo insuficiente", ex.getMessage(), request);
-    }
-	
+	public ResponseEntity<ErrorResponse> handleSaldoInsuficiente(SaldoInsuficienteException ex,
+			HttpServletRequest request) {
+		// Retorna 400 Bad Request
+		return buildResponse(HttpStatus.BAD_REQUEST, "Saldo insuficiente", ex.getMessage(), request);
+	}
+
+	@ExceptionHandler(CuentaBloqueadaException.class)
+	public ResponseEntity<ErrorResponse> handleCuentaBloqueada(CuentaBloqueadaException ex,
+			HttpServletRequest request) {
+		// Retorna 403 Forbidden
+		return buildResponse(HttpStatus.FORBIDDEN, "Cuenta bloqueada", ex.getMessage(), request);
+	}
+
 	/**
-     * Método auxiliar para construir la respuesta JSON estandarizada.
-     */
-	private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String error, String detalle, HttpServletRequest request){
-		ErrorResponse response = new ErrorResponse(
-				Instant.now(),
-				status.value(),
-				error,
-				detalle,
-				request.getRequestURI()
-				);
-		
+	 * Método auxiliar para construir la respuesta JSON estandarizada.
+	 */
+	private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String error, String detalle,
+			HttpServletRequest request) {
+		ErrorResponse response = new ErrorResponse(Instant.now(), status.value(), error, detalle,
+				request.getRequestURI());
+
 		return new ResponseEntity<ErrorResponse>(response, status);
 	}
 }

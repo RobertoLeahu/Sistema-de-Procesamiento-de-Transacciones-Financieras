@@ -32,22 +32,22 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class Cuenta {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    @Column(unique = true)
-    private String numeroCuenta;
-    
-    private BigDecimal saldo;
-    
-    @Enumerated(EnumType.STRING)
-    private TipoCuenta tipo;
-    
-    @Enumerated(EnumType.STRING)
-    private EstadoCuenta estado;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cliente_id")
-    private Cliente cliente;
+	@Column(unique = true)
+	private String numeroCuenta;
+
+	private BigDecimal saldo;
+
+	@Enumerated(EnumType.STRING)
+	private TipoCuenta tipo;
+
+	@Enumerated(EnumType.STRING)
+	private EstadoCuenta estado;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "cliente_id")
+	private Cliente cliente;
 }

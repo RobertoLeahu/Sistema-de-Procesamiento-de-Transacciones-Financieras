@@ -1,7 +1,8 @@
 package com.banco.transacciones.exception;
 
 /**
- * Excepción lanzada cuando el saldo de una cuenta es inferior al monto solicitado.
+ * Excepción lanzada cuando el saldo de una cuenta es inferior al monto
+ * solicitado.
  */
 
 public class SaldoInsuficienteException extends RuntimeException {

@@ -5,7 +5,5 @@ package com.banco.transacciones.domain.enums;
  */
 
 public enum EstadoCuenta {
-	ACTIVADA,
-	BLOQUEADA,
-	CERRADA
+	ACTIVADA, BLOQUEADA, CERRADA
 }

@@ -27,19 +27,19 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class Cliente {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    private String nombre;
-    
-    @Column(unique = true)
-    private String dni;
-    
-    private String email;
-    
-    private LocalDate fechaAlta;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    @OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL)
-    private List<Cuenta> cuentas;
+	private String nombre;
+
+	@Column(unique = true)
+	private String dni;
+
+	private String email;
+
+	private LocalDate fechaAlta;
+
+	@OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL)
+	private List<Cuenta> cuentas;
 }

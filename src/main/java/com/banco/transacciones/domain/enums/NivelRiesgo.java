@@ -5,8 +5,5 @@ package com.banco.transacciones.domain.enums;
  */
 
 public enum NivelRiesgo {
-	BAJO,
-	MEDIO,
-	ALTO,
-	CRITICO
+	BAJO, MEDIO, ALTO, CRITICO
 }

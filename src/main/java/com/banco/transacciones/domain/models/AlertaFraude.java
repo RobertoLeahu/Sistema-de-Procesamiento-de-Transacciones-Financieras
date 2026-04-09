@@ -18,7 +18,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Entidad que registra las alertas de posibles fraudes detectadas por el sistema.
+ * Entidad que registra las alertas de posibles fraudes detectadas por el
+ * sistema.
  */
 
 @Entity
@@ -29,18 +30,18 @@ import lombok.NoArgsConstructor;
 @Builder
 public class AlertaFraude {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaccion_id", nullable = false)
-    private Transaccion transaccion;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "transaccion_id", nullable = false)
+	private Transaccion transaccion;
 
-    @Enumerated(EnumType.STRING)
-    private NivelRiesgo nivel;
+	@Enumerated(EnumType.STRING)
+	private NivelRiesgo nivel;
 
-    private String motivo;
+	private String motivo;
 
-    private Boolean revisada;
+	private Boolean revisada;
 }
