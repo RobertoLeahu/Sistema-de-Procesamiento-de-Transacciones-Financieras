@@ -28,10 +28,10 @@ public class AsyncConfig {
 
 		executor.setThreadNamePrefix("trans-exec-");
 
-		executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-
 		// Inyectamos el decorador para no perder el correlationId
 		executor.setTaskDecorator(new MdcTaskDecorator());
+		
+		executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
 
 		executor.initialize();
 
