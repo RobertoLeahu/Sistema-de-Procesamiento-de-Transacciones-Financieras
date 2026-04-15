@@ -21,8 +21,8 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Long> {
 	 * finalice, evitando condiciones de carrera.
 	 */
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
-	@Query("SELECT c FROM cuentas c WHERE c.numeroCuenta = :numeroCuenta")
+	@Query("SELECT c FROM Cuenta c WHERE c.numeroCuenta = :numeroCuenta")
 	Optional<Cuenta> findByNumeroCuentaWithLock(@Param("numeroCuenta") String numeroCuenta);
 
-	Optional<Cuenta> findbyNumeroCuenta(String numeroCuenta);
+	Optional<Cuenta> findByNumeroCuenta(String numeroCuenta);
 }
