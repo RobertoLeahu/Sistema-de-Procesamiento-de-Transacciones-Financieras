@@ -20,7 +20,6 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Long> {
 	 * Esto bloquea la fila en la base de datos hasta que la transacción actual
 	 * finalice, evitando condiciones de carrera.
 	 */
-
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("SELECT c FROM cuentas c WHERE c.numeroCuenta = :numeroCuenta")
 	Optional<Cuenta> findByNumeroCuentaWithLock(@Param("numeroCuenta") String numeroCuenta);
