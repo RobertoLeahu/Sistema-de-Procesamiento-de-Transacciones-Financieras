@@ -165,4 +165,13 @@ public class TransaccionProcesador {
 			transaccionRepository.save(tx);
 		}
 	}
+	
+	/**
+     * Helper para inicializar una entidad Transaccion en procesos de lote.
+     */
+	private Transaccion crearEntidadInicial(TransferenciaDTO dto) {
+		return Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
+				.monto(dto.monto()).tipo(TipoTransaccion.TRANSFERENCIA).estado(EstadoTransaccion.PENDIENTE)
+				.fechaHora(Instant.now()).build();
+	}
 }
