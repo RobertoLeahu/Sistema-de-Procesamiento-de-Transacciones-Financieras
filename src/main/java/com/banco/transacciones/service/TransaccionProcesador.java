@@ -68,4 +68,35 @@ public class TransaccionProcesador {
 			MDC.clear();
 		}
 	}
+	
+	/**
+     * Procesa un sublote de transacciones de forma aislada.
+     * Utiliza PROPAGATION_REQUIRES_NEW para asegurar que el fallo de una transacción
+     * no comprometa la atomicidad de las demás dentro del mismo hilo.
+     *
+     * @param sublote Lista de hasta 50 transferencias.
+     * @param correlationId ID de seguimiento.
+     * @return CompletableFuture con el resumen del procesamiento del sublote.
+     */
+	@Async("transaccionExecutor")
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public CompletableFuture<ResumenLoteDTO> procesarSubloteAsync(List<TransferenciaDTO> sublote,
+			String correlationId) {
+		MDC.put("correlationId", correlationId);
+		int exitosas = 0;
+		int fallidas = 0;
+
+		for (TransferenciaDTO dto : sublote) {
+			try {
+				Transaccion tx = crearEntidadInicial(dto);
+				procesarTransferenciaInternal(dto, tx);
+				exitosas++;
+			} catch (Exception e) {
+				log.error("Fallo en transacción de sublote: {}", e.getMessage());
+				fallidas++;
+			}
+		}
+		MDC.clear();
+		return CompletableFuture.completedFuture(new ResumenLoteDTO(sublote.size(), exitosas, fallidas));
+	}
 }
