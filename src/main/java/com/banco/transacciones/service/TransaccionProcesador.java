@@ -29,9 +29,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Motor de procesamiento asíncrono para transacciones financieras.
- * Implementa la lógica de validación de saldo, bloqueo pesimista de cuentas,
- * detección de fraude en paralelo y gestión de estados finales.
+ * Motor de procesamiento asíncrono para transacciones financieras. Implementa
+ * la lógica de validación de saldo, bloqueo pesimista de cuentas, detección de
+ * fraude en paralelo y gestión de estados finales.
  */
 @Slf4j
 @Service
@@ -44,13 +44,13 @@ public class TransaccionProcesador {
 	private final AlertaFraudeRepository alertaFraudeRepository;
 
 	/**
-     * Ejecuta el flujo completo de una transferencia en un hilo del pool configurado.
-     * Restaura el contexto de log (MDC) para mantener la trazabilidad.
-     *
-     * @param dto Datos de la transferencia.
-     * @param transaccionId ID de la transacción persistida previamente.
-     * @param correlationId ID único de seguimiento para logs.
-     */
+	 * Ejecuta el flujo completo de una transferencia en un hilo del pool
+	 * configurado. Restaura el contexto de log (MDC) para mantener la trazabilidad.
+	 *
+	 * @param dto           Datos de la transferencia.
+	 * @param transaccionId ID de la transacción persistida previamente.
+	 * @param correlationId ID único de seguimiento para logs.
+	 */
 	@Async("transaccionExecutor")
 	@Transactional
 	public void ejecutarTransferenciaAsync(TransferenciaDTO dto, Long transaccionId, String correlationId) {
@@ -68,16 +68,16 @@ public class TransaccionProcesador {
 			MDC.clear();
 		}
 	}
-	
+
 	/**
-     * Procesa un sublote de transacciones de forma aislada.
-     * Utiliza PROPAGATION_REQUIRES_NEW para asegurar que el fallo de una transacción
-     * no comprometa la atomicidad de las demás dentro del mismo hilo.
-     *
-     * @param sublote Lista de hasta 50 transferencias.
-     * @param correlationId ID de seguimiento.
-     * @return CompletableFuture con el resumen del procesamiento del sublote.
-     */
+	 * Procesa un sublote de transacciones de forma aislada. Utiliza
+	 * PROPAGATION_REQUIRES_NEW para asegurar que el fallo de una transacción no
+	 * comprometa la atomicidad de las demás dentro del mismo hilo.
+	 *
+	 * @param sublote       Lista de hasta 50 transferencias.
+	 * @param correlationId ID de seguimiento.
+	 * @return CompletableFuture con el resumen del procesamiento del sublote.
+	 */
 	@Async("transaccionExecutor")
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public CompletableFuture<ResumenLoteDTO> procesarSubloteAsync(List<TransferenciaDTO> sublote,
@@ -99,14 +99,14 @@ public class TransaccionProcesador {
 		MDC.clear();
 		return CompletableFuture.completedFuture(new ResumenLoteDTO(sublote.size(), exitosas, fallidas));
 	}
-	
+
 	/**
-     * Lógica central de procesamiento: bloqueo de cuentas, validación de reglas 
-     * de negocio y orquestación del análisis de fraude en paralelo.
-     *
-     * @param dto Datos de entrada.
-     * @param tx Entidad de transacción a actualizar.
-     */
+	 * Lógica central de procesamiento: bloqueo de cuentas, validación de reglas de
+	 * negocio y orquestación del análisis de fraude en paralelo.
+	 *
+	 * @param dto Datos de entrada.
+	 * @param tx  Entidad de transacción a actualizar.
+	 */
 	private void procesarTransferenciaInternal(TransferenciaDTO dto, Transaccion tx) {
 		tx.setEstado(EstadoTransaccion.PROCESANDO);
 		transaccionRepository.saveAndFlush(tx);
@@ -165,19 +165,19 @@ public class TransaccionProcesador {
 			transaccionRepository.save(tx);
 		}
 	}
-	
+
 	/**
-     * Helper para inicializar una entidad Transaccion en procesos de lote.
-     */
+	 * Helper para inicializar una entidad Transaccion en procesos de lote.
+	 */
 	private Transaccion crearEntidadInicial(TransferenciaDTO dto) {
 		return Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
 				.monto(dto.monto()).tipo(TipoTransaccion.TRANSFERENCIA).estado(EstadoTransaccion.PENDIENTE)
 				.fechaHora(Instant.now()).build();
 	}
-	
+
 	/**
-     * Persiste una alerta de fraude vinculada a una transacción sospechosa.
-     */
+	 * Persiste una alerta de fraude vinculada a una transacción sospechosa.
+	 */
 	private void generarAlerta(Transaccion tx, NivelRiesgo nivel, String motivo) {
 		alertaFraudeRepository
 				.save(AlertaFraude.builder().transaccion(tx).nivel(nivel).motivo(motivo).revisada(false).build());
