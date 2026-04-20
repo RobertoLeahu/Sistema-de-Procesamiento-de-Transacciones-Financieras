@@ -174,4 +174,12 @@ public class TransaccionProcesador {
 				.monto(dto.monto()).tipo(TipoTransaccion.TRANSFERENCIA).estado(EstadoTransaccion.PENDIENTE)
 				.fechaHora(Instant.now()).build();
 	}
+	
+	/**
+     * Persiste una alerta de fraude vinculada a una transacción sospechosa.
+     */
+	private void generarAlerta(Transaccion tx, NivelRiesgo nivel, String motivo) {
+		alertaFraudeRepository
+				.save(AlertaFraude.builder().transaccion(tx).nivel(nivel).motivo(motivo).revisada(false).build());
+	}
 }
