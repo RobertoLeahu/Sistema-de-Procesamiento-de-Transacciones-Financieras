@@ -1,7 +1,7 @@
 package com.banco.transacciones.repository;
 
 import java.time.Instant;
-import java.util.Optional;
+import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -20,10 +20,10 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
 	/**
 	 * Recupera transacciones del último día para la detección de ciclos.
 	 */
-	Optional<Transaccion> findByFechaHoraAfter(Instant fechaHora);
+	List<Transaccion> findByFechaHoraAfter(Instant fechaHora);
 
 	/**
 	 * Generar el resumen de movimientos de la cuenta origen
 	 */
-	Optional<Transaccion> findByCuentaOrigenOrCuentaDestino(String cuentaOrigenId, String cuentaDestinoId);
+	List<Transaccion> findByCuentaOrigenOrCuentaDestino(String cuentaOrigen, String cuentaDestino);
 }
