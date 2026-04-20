@@ -106,4 +106,33 @@ public class TransaccionServiceImpl {
 			MDC.clear();
 		}
 	}
+
+	/**
+	 * Consulta el estado actual de una transacción en proceso. Utiliza
+	 * {@code readOnly = true} para optimizar el rendimiento al evitar la gestión de
+	 * persistencia de cambios innecesaria en la base de datos.
+	 * 
+	 * @param id Identificador único de la transacción.
+	 * @return DTO con la información de estado y riesgo de la transacción.
+	 * @throws TransaccionNotFoundException si el ID no corresponde a ninguna
+	 *                                      transacción.
+	 */
+	@Transactional(readOnly = true)
+	public TransaccionDTO obtenerEstadoTransaccion(Long id) {
+		// Aseguramos la trazabilidad incluso en operaciones de lectura
+		if (MDC.get("correlationId") == null) {
+			MDC.put("correlationId", java.util.UUID.randomUUID().toString());
+		}
+
+		log.info("Entrada: Consultando estado para TX ID: {}", id);
+
+		Transaccion tx = transaccionRepository.findById(id).orElseThrow(() -> {
+			log.warn("Salida: Transacción {} no encontrada", id);
+			return new TransaccionNotFoundException("Transacción no encontrada con ID: " + id);
+		});
+
+		log.info("Salida: Estado recuperado para TX ID: {} - Estado: {}", id, tx.getEstado());
+
+		return mapper.toResponse(tx);
+	}
 }
