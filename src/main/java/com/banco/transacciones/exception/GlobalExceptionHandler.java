@@ -49,6 +49,13 @@ public class GlobalExceptionHandler {
 				"La cuenta está siendo procesada por otra transacción. Intente de nuevo.", request);
 	}
 
+	@ExceptionHandler(AlertaNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleAlertaNotFound(AlertaNotFoundException ex, HttpServletRequest request) {
+		// Retorna 404 Not Found siguiendo el estándar de recursos no encontrados
+		log.warn("Alerta no encontrada: {} en el path: {}", ex.getMessage(), request.getRequestURI());
+		return buildResponse(HttpStatus.NOT_FOUND, "Alerta no encontrada", ex.getMessage(), request);
+	}
+
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex, HttpServletRequest request) {
 		// Nivel error para fallos críticos no controlados
