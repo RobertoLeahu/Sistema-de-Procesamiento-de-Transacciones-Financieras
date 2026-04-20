@@ -10,7 +10,7 @@ import com.banco.transacciones.dto.response.TransaccionDTO;
  * Mapper generado automáticamente en tiempo de compilación para aislar el
  * modelo de dominio.
  */
-@Mapper
+@Mapper(componentModel = "spring")
 public interface TransaccionMapper {
 
 	// Mapea de Entidad a DTO de salida
