@@ -20,6 +20,7 @@ import com.banco.transacciones.dto.request.TransferenciaDTO;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
 import com.banco.transacciones.exception.SaldoInsuficienteException;
+import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
@@ -58,10 +59,9 @@ public class TransaccionProcesador {
 		log.info("Iniciando procesamiento asíncrono para TX ID: {}", transaccionId);
 		try {
 			Transaccion tx = transaccionRepository.findById(transaccionId)
-					.orElseThrow(() -> new RuntimeException("TX no encontrada"));
+					.orElseThrow(() -> new TransaccionNotFoundException("TX no encontrada con ID: " + transaccionId));
 
 			procesarTransferenciaInternal(dto, tx);
-			log.info("Procesamiento finalizado para TX ID: {}", transaccionId);
 		} catch (Exception e) {
 			log.error("Fallo crítico en TX {}: {}", transaccionId, e.getMessage());
 		} finally {
