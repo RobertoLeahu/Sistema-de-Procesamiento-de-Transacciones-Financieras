@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import com.banco.transacciones.domain.models.AlertaFraude;
+import com.banco.transacciones.dto.response.AlertaFraudeDTO;
 
 @Repository
 public interface AlertaFraudeRepository extends JpaRepository<AlertaFraude, Long> {
@@ -13,5 +14,5 @@ public interface AlertaFraudeRepository extends JpaRepository<AlertaFraude, Long
 	/**
 	 * Retorna alertas no revisadas ordenadas por riesgo y fecha.
 	 */
-	Page<AlertaFraude> findByRevisadaFalse(Pageable pageable);
+	Page<AlertaFraudeDTO> findByRevisadaFalse(Pageable pageable);
 }
