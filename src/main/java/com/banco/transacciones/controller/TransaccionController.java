@@ -1,5 +1,7 @@
 package com.banco.transacciones.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -11,10 +13,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.banco.transacciones.dto.request.TransferenciaDTO;
+import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.dto.response.TransaccionDTO;
 import com.banco.transacciones.service.impl.TransaccionServiceImpl;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -49,5 +54,16 @@ public class TransaccionController {
 	public ResponseEntity<TransaccionDTO> obtenerEstado(@PathVariable Long id) {
 		TransaccionDTO response = transaccionService.obtenerEstadoTransaccion(id);
 		return ResponseEntity.ok(response);
+	}
+
+	/**
+	 * Procesa un lote de transacciones en paralelo. Retorna 202 Accepted. La
+	 * validación restringe envíos vacíos.
+	 */
+	@PostMapping("/lote")
+	public ResponseEntity<ResumenLoteDTO> procesarLote(
+			@Valid @NotEmpty @Size(max = 500) @RequestBody List<TransferenciaDTO> lote) {
+		ResumenLoteDTO resumen = transaccionService.procesarLote(lote);
+		return ResponseEntity.status(HttpStatus.ACCEPTED).body(resumen);
 	}
 }
