@@ -121,7 +121,7 @@ public class TransaccionServiceImpl {
 	public TransaccionDTO obtenerEstadoTransaccion(Long id) {
 		// Aseguramos la trazabilidad incluso en operaciones de lectura
 		if (MDC.get("correlationId") == null) {
-			MDC.put("correlationId", java.util.UUID.randomUUID().toString());
+			MDC.put("correlationId", UUID.randomUUID().toString());
 		}
 
 		log.info("Entrada: Consultando estado para TX ID: {}", id);

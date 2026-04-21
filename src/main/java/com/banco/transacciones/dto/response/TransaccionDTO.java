@@ -3,6 +3,9 @@ package com.banco.transacciones.dto.response;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+/**
+ * Record inmutable para representar una transacción.
+ */
 public record TransaccionDTO(
 		Long id,
 		String cuentaOrigen,
