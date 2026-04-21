@@ -18,8 +18,6 @@ import com.banco.transacciones.domain.models.Cuenta;
 import com.banco.transacciones.domain.models.Transaccion;
 import com.banco.transacciones.dto.request.TransferenciaDTO;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
-import com.banco.transacciones.exception.CuentaBloqueadaException;
-import com.banco.transacciones.exception.SaldoInsuficienteException;
 import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
@@ -111,56 +109,36 @@ public class TransaccionProcesador {
 		tx.setEstado(EstadoTransaccion.PROCESANDO);
 		transaccionRepository.saveAndFlush(tx);
 
-		// 1. Ejecutar análisis de fraude en paralelo
+		// 1. Iniciar análisis de fraude ANTES de bloquear la BD
 		CompletableFuture<Double> fraudeFuture = CompletableFuture
 				.supplyAsync(() -> fraudeScoreCalculator.calcularScore(dto));
 
+		double riesgo = fraudeFuture.join();
+		tx.setRiesgoFraude(riesgo);
+
 		try {
-			// 2. Bloqueo Pesimista Eficiente y Ordenado
+			// 2. Bloqueo Pesimista
 			boolean origenPrimero = dto.cuentaOrigen().compareTo(dto.cuentaDestino()) < 0;
 			String c1 = origenPrimero ? dto.cuentaOrigen() : dto.cuentaDestino();
 			String c2 = origenPrimero ? dto.cuentaDestino() : dto.cuentaOrigen();
 
-			// Obtenemos la entidad directamente con el bloqueo aplicado
 			Cuenta cuenta1 = cuentaRepository.findByNumeroCuentaWithLock(c1).orElseThrow();
 			Cuenta cuenta2 = cuentaRepository.findByNumeroCuentaWithLock(c2).orElseThrow();
 
 			Cuenta origen = origenPrimero ? cuenta1 : cuenta2;
 			Cuenta destino = origenPrimero ? cuenta2 : cuenta1;
 
-			// 3. Validaciones de Negocio
-			if (!origen.getEstado().name().equals("ACTIVA")) {
-				throw new CuentaBloqueadaException("Cuenta origen bloqueada");
-			}
-			if (origen.getSaldo().compareTo(dto.monto()) < 0) {
-				throw new SaldoInsuficienteException("Sin fondos suficientes");
-			}
-
-			// 4. Sincronizamos con el resultado del modelo de fraude
-			double riesgo = fraudeFuture.join();
-			tx.setRiesgoFraude(riesgo);
-
+			// 3. Validaciones y ejecución
 			if (riesgo > 0.75) {
 				tx.setEstado(EstadoTransaccion.RECHAZADA);
 				generarAlerta(tx, NivelRiesgo.CRITICO, "Riesgo alto detectado: " + riesgo);
-				log.warn("Transacción {} rechazada por riesgo de fraude", tx.getId());
 			} else {
-				// Actualizamos saldos
 				origen.setSaldo(origen.getSaldo().subtract(dto.monto()));
 				destino.setSaldo(destino.getSaldo().add(dto.monto()));
-				cuentaRepository.save(origen);
-				cuentaRepository.save(destino);
-
 				tx.setEstado(EstadoTransaccion.COMPLETADA);
 			}
-		} catch (SaldoInsuficienteException | CuentaBloqueadaException e) {
-			tx.setEstado(EstadoTransaccion.RECHAZADA);
-			log.warn("Transacción {} rechazada por regla de negocio: {}", tx.getId(), e.getMessage());
-			throw e;
 		} catch (Exception e) {
-			tx.setEstado(EstadoTransaccion.REVERTIDA);
-			log.error("Error técnico procesando TX {}: {}", tx.getId(), e.getMessage());
-			throw new RuntimeException("Error inesperado", e);
+			throw e;
 		} finally {
 			transaccionRepository.save(tx);
 		}
