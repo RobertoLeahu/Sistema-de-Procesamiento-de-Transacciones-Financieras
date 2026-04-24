@@ -2,8 +2,11 @@ package com.banco.transacciones.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.banco.transacciones.domain.models.Transaccion;
@@ -26,4 +29,12 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
 	 * Generar el resumen de movimientos de la cuenta origen
 	 */
 	List<Transaccion> findByCuentaOrigenOrCuentaDestino(String cuentaOrigen, String cuentaDestino);
+
+	
+	/**
+	 * Consulta que determine cuál es el país habitual.
+	 */
+	@Query(value = "SELECT t.codigo_pais FROM transacciones t " + "WHERE t.cuenta_origen = :cuenta "
+			+ "GROUP BY t.codigo_pais " + "ORDER BY COUNT(*) DESC LIMIT 1", nativeQuery = true)
+	Optional<String> findPaisHabitual(@Param("cuenta") String cuenta);
 }
