@@ -148,9 +148,15 @@ public class TransaccionProcesador {
 	 * Helper para inicializar una entidad Transaccion en procesos de lote.
 	 */
 	private Transaccion crearEntidadInicial(TransferenciaDTO dto) {
-		return Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
-				.monto(dto.monto()).tipo(TipoTransaccion.TRANSFERENCIA).estado(EstadoTransaccion.PENDIENTE)
-				.fechaHora(Instant.now()).build();
+	    return Transaccion.builder()
+	            .cuentaOrigen(dto.cuentaOrigen())
+	            .cuentaDestino(dto.cuentaDestino())
+	            .monto(dto.monto())
+	            .codigoPais(dto.codigoPais())
+	            .tipo(TipoTransaccion.TRANSFERENCIA)
+	            .estado(EstadoTransaccion.PENDIENTE)
+	            .fechaHora(Instant.now())
+	            .build();
 	}
 
 	/**
@@ -158,6 +164,10 @@ public class TransaccionProcesador {
 	 */
 	private void generarAlerta(Transaccion tx, NivelRiesgo nivel, String motivo) {
 		alertaFraudeRepository
-				.save(AlertaFraude.builder().transaccion(tx).nivel(nivel).motivo(motivo).revisada(false).build());
+				.save(AlertaFraude.builder()
+						.transaccion(tx)
+						.nivel(nivel).motivo(motivo)
+						.revisada(false)
+						.build());
 	}
 }
