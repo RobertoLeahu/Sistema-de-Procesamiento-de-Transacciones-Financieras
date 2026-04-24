@@ -74,9 +74,22 @@ public class FraudeScoreCalculator {
 		}
 
 		// País fuera del patrón habitual del cliente
-		score += PESO_PAIS;
+	    if (esPaisInusual(request)) {
+	        score += PESO_PAIS;
+	    }
 
 		// Garantiza límite entre 0.0 y 1.0
 		return Math.min(score, 1.0);
+	}
+	
+	private boolean esPaisInusual(TransferenciaDTO request) {
+	    String paisHabitual = transaccionRepository.findPaisHabitual(request.cuentaOrigen())
+	            .orElseGet(() -> {
+	                return cuentaRepository.findByNumeroCuenta(request.cuentaOrigen())
+	                        .map(c -> c.getCliente().getPaisResidencia())
+	                        .orElse("XX");
+	            });
+
+	    return !request.codigoPais().equalsIgnoreCase(paisHabitual);
 	}
 }
