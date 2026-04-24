@@ -14,5 +14,5 @@ public interface AlertaFraudeRepository extends JpaRepository<AlertaFraude, Long
 	/**
 	 * Retorna alertas no revisadas ordenadas por riesgo y fecha.
 	 */
-	Page<AlertaFraudeDTO> findByRevisadaFalse(Pageable pageable);
+	Page<AlertaFraude> findByRevisadaFalse(Pageable pageable);
 }
