@@ -47,6 +47,7 @@ public class Transaccion {
 	private EstadoTransaccion estado;
 
 	private Instant fechaHora;
+	private String codigoPais;
 	private String descripcion;
 	private Double riesgoFraude;
 
