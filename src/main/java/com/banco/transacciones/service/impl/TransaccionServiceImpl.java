@@ -48,26 +48,31 @@ public class TransaccionServiceImpl {
 	 */
 	@Transactional
 	public TransaccionDTO iniciarTransferencia(TransferenciaDTO dto) {
-		// Generamos el ID de correlación para la trazabilidad
-		String correlationId = UUID.randomUUID().toString();
-		MDC.put("correlationId", correlationId);
+	    String correlationId = UUID.randomUUID().toString();
+	    MDC.put("correlationId", correlationId);
 
-		try {
-			log.info("Iniciando transferencia origen: {}, destino: {}", dto.cuentaOrigen(), dto.cuentaDestino());
+	    try {
+	        log.info("Iniciando transferencia - Origen: {}, Destino: {}, País: {}", 
+	                 dto.cuentaOrigen(), dto.cuentaDestino(), dto.codigoPais());
 
-			Transaccion tx = Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
-					.monto(dto.monto()).tipo(TipoTransaccion.TRANSFERENCIA).estado(EstadoTransaccion.PENDIENTE)
-					.fechaHora(Instant.now()).build();
+	        Transaccion tx = Transaccion.builder()
+	                .cuentaOrigen(dto.cuentaOrigen())
+	                .cuentaDestino(dto.cuentaDestino())
+	                .monto(dto.monto())
+	                .codigoPais(dto.codigoPais())
+	                .tipo(TipoTransaccion.TRANSFERENCIA)
+	                .estado(EstadoTransaccion.PENDIENTE)
+	                .fechaHora(Instant.now())
+	                .build();
 
-			tx = transaccionRepository.save(tx);
+	        tx = transaccionRepository.save(tx);
 
-			// Pasamos el correlationId al hilo asíncrono
-			transaccionProcesador.ejecutarTransferenciaAsync(dto, tx.getId(), correlationId);
+	        transaccionProcesador.ejecutarTransferenciaAsync(dto, tx.getId(), correlationId);
 
-			return mapper.toResponse(tx);
-		} finally {
-			MDC.clear();
-		}
+	        return mapper.toResponse(tx);
+	    } finally {
+	        MDC.clear();
+	    }
 	}
 
 	/**
