@@ -29,6 +29,10 @@ public record TransferenciaDTO(
 		@Positive(message = "El monto debe ser mayor a cero")
 		@DecimalMax(value = "50000.00", message = "El monto máximo por transacción es 50000.00")
 		BigDecimal monto,
+		
+		@NotBlank(message = "El código de país es obligatorio")
+	    @Size(min = 2, max = 2, message = "Debe ser un código ISO de 2 letras")
+	    String codigoPais,
 
 		@Size(max = 255, message = "La descripción es demasiado larga")
 		String descripcion) {
