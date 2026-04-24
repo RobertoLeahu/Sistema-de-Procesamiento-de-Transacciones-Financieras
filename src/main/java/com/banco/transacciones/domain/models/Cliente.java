@@ -37,8 +37,8 @@ public class Cliente {
 	private String dni;
 
 	private String email;
-
 	private LocalDate fechaAlta;
+	private String paisResidencia;
 
 	@OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL)
 	private List<Cuenta> cuentas;
