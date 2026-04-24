@@ -11,6 +11,7 @@ import com.banco.transacciones.domain.enums.NivelRiesgo;
 import com.banco.transacciones.domain.models.AlertaFraude;
 import com.banco.transacciones.dto.response.AlertaFraudeDTO;
 import com.banco.transacciones.exception.AlertaNotFoundException;
+import com.banco.transacciones.mapper.AlertaFraudeMapper;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -27,15 +28,17 @@ import lombok.extern.slf4j.Slf4j;
 public class FraudeServiceImpl {
 
 	private final AlertaFraudeRepository alertaFraudeRepository;
+	private final AlertaFraudeMapper alertaFraudeMapper;
 
 	/**
 	 * Retorna alertas no revisadas ordenadas por riesgo (CRITICO primero) y fecha.
 	 */
 	@Transactional(readOnly = true)
 	public Page<AlertaFraudeDTO> obtenerAlertasNoRevisadas(Pageable pageable) {
-		log.info("Consultando alertas de fraude pendientes con paginación");
-		return alertaFraudeRepository.findByRevisadaFalse(pageable);
-	}
+	    log.info("Consultando alertas de fraude pendientes");
+	    return alertaFraudeRepository.findByRevisadaFalse(pageable)
+	    		.map(alerta -> alertaFraudeMapper.toDto(alerta));	
+	    }
 
 	/**
 	 * Marca una alerta como revisada y dispara notificaciones si es nivel CRITICO.
