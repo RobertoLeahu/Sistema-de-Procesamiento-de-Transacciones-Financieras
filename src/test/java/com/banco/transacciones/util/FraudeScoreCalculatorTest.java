@@ -31,16 +31,17 @@ import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
 
 /**
- * Clase de pruebas unitarias para la validación de reglas en {@link FraudeScoreCalculator}.
- * * Verifica el correcto cálculo del "score" (puntuación) de riesgo de fraude 
- * sumando diferentes pesos basados en las siguientes reglas de negocio:
- * - Monto elevado: La transferencia supera un umbral establecido (ej. +0.30).
- * - Horario nocturno: La transacción se realiza de madrugada (ej. +0.20).
- * - Alta frecuencia: El origen tiene demasiadas operaciones en poco tiempo (ej. +0.25).
- * - Cuenta reciente: La cuenta destino tiene pocos días de antigüedad (ej. +0.15).
- * - País inusual: El país de la transferencia no coincide con el habitual del cliente (ej. +0.10).
- * * Nota técnica: Se utiliza {@code MockedStatic} sobre {@link Instant} para fijar 
- * el reloj del sistema durante las pruebas. Esto garantiza que las validaciones de 
+ * Clase de pruebas unitarias para la validación de reglas en
+ * {@link FraudeScoreCalculator}. * Verifica el correcto cálculo del "score"
+ * (puntuación) de riesgo de fraude sumando diferentes pesos basados en las
+ * siguientes reglas de negocio: - Monto elevado: La transferencia supera un
+ * umbral establecido (ej. +0.30). - Horario nocturno: La transacción se realiza
+ * de madrugada (ej. +0.20). - Alta frecuencia: El origen tiene demasiadas
+ * operaciones en poco tiempo (ej. +0.25). - Cuenta reciente: La cuenta destino
+ * tiene pocos días de antigüedad (ej. +0.15). - País inusual: El país de la
+ * transferencia no coincide con el habitual del cliente (ej. +0.10). * Nota
+ * técnica: Se utiliza {@code MockedStatic} sobre {@link Instant} para fijar el
+ * reloj del sistema durante las pruebas. Esto garantiza que las validaciones de
  * horarios (diurno/nocturno) sean deterministas y evita los flaky tests.
  */
 @ExtendWith(MockitoExtension.class)
@@ -54,9 +55,9 @@ class FraudeScoreCalculatorTest {
 
 	@Mock
 	private CuentaRepository cuentaRepository;
-	
+
 	@Mock
-    private Clock clock;
+	private Clock clock;
 
 	private MockedStatic<Instant> mockedInstant;
 
@@ -71,11 +72,16 @@ class FraudeScoreCalculatorTest {
 			.toInstant();
 
 	@BeforeEach
-    void setUp() {
-        Mockito.lenient().when(clock.instant()).thenReturn(INSTANT_DIURNO);
-        Mockito.lenient().when(clock.getZone()).thenReturn(ZoneId.systemDefault());
-    }
+	void setUp() {
+		Mockito.lenient().when(clock.instant()).thenReturn(INSTANT_DIURNO);
+		Mockito.lenient().when(clock.getZone()).thenReturn(ZoneId.systemDefault());
+	}
 
+	/**
+	 * Verifica el flujo nominal de una operacion legitima. Asegura que si ningun
+	 * umbral o heuristica de riesgo se dispara, el motor estadistico mantenga el
+	 * acumulador estrictamente en 0.0.
+	 */
 	@Test
 	@DisplayName("Debe retornar score 0.0 cuando ninguna regla de fraude se cumple")
 	void calcularScore_SinRiesgo_RetornaCero() {
@@ -88,6 +94,11 @@ class FraudeScoreCalculatorTest {
 		assertEquals(0.0, score, 0.001);
 	}
 
+	/**
+	 * Comprueba el peor escenario estadistico posible. Garantiza que la
+	 * coincidencia simultanea de todos los indicadores de riesgo sume exactamente
+	 * 1.0 (100%), marcando el limite superior matematico del calculador.
+	 */
 	@Test
 	@DisplayName("Debe retornar score 1.0 cuando TODAS las reglas se cumplen")
 	void calcularScore_RiesgoMaximo_RetornaUno() {
@@ -104,6 +115,11 @@ class FraudeScoreCalculatorTest {
 		assertEquals(1.0, score, 0.001);
 	}
 
+	/**
+	 * Aísla y valida la regla de impacto financiero. Asegura que el sobrepasar el
+	 * limite monetario configurado incremente la ponderacion exacta estipulada para
+	 * este factor individual.
+	 */
 	@Test
 	@DisplayName("Debe sumar 0.30 cuando solo el monto supera el umbral")
 	void calcularScore_SoloMontoAlto_SumaTreinta() {
@@ -114,6 +130,11 @@ class FraudeScoreCalculatorTest {
 		assertEquals(0.30, score, 0.001);
 	}
 
+	/**
+	 * Comprueba la heuristica cronologica. Mediante la inyeccion de un reloj fijo,
+	 * asegura que las transacciones ejecutadas en horario no comercial o madrugada
+	 * reciban la penalizacion por comportamiento inusual.
+	 */
 	@Test
 	@DisplayName("Debe sumar 0.20 cuando la transacción es en horario nocturno")
 	void calcularScore_SoloHoraNocturna_SumaVeinte() {
@@ -125,6 +146,11 @@ class FraudeScoreCalculatorTest {
 		assertEquals(0.20, score, 0.001);
 	}
 
+	/**
+	 * Valida la regla de deteccion de rafagas o ataques automatizados. Verifica que
+	 * la acumulacion acelerada de peticiones desde un mismo origen infle el score
+	 * de riesgo preventivamente.
+	 */
 	@Test
 	@DisplayName("Debe sumar 0.25 cuando hay alta frecuencia de transacciones")
 	void calcularScore_SoloFrecuencia_SumaVeinticinco() {
@@ -135,6 +161,10 @@ class FraudeScoreCalculatorTest {
 		assertEquals(0.25, score, 0.001);
 	}
 
+	/**
+	 * Aísla la verificacion anti-mulas. Penaliza el envio de fondos hacia cuentas
+	 * de nueva creacion que no cuentan con un historial comprobado en el banco.
+	 */
 	@Test
 	@DisplayName("Debe sumar 0.15 cuando la cuenta destino es reciente (< 7 días)")
 	void calcularScore_SoloCuentaNueva_SumaQuince() {
@@ -145,6 +175,11 @@ class FraudeScoreCalculatorTest {
 		assertEquals(0.15, score, 0.001);
 	}
 
+	/**
+	 * Verifica la geolocalizacion del riesgo basado en inteligencia historica.
+	 * Aumenta el score si el pais de destino difiere del comportamiento habitual
+	 * que el modelo ha registrado previamente para esa cuenta.
+	 */
 	@Test
 	@DisplayName("Debe sumar 0.10 cuando el país es inusual basado en el historial")
 	void calcularScore_SoloPaisInusual_SumaDiez() {
@@ -155,6 +190,11 @@ class FraudeScoreCalculatorTest {
 		assertEquals(0.10, score, 0.001);
 	}
 
+	/**
+	 * Comprueba la resiliencia del modelo predictivo frente a la falta de
+	 * historial. Asegura que, si no hay registros previos, el motor se apoye en los
+	 * datos base de residencia del cliente para ejecutar la evaluacion geografica.
+	 */
 	@Test
 	@DisplayName("Evalúa país inusual usando el fallback de la cuenta cuando no hay historial")
 	void calcularScore_PaisInusual_FallbackCuenta_SumaDiez() {
@@ -183,7 +223,12 @@ class FraudeScoreCalculatorTest {
 		double score = calculator.calcularScore(request);
 		assertEquals(0.10, score, 0.001);
 	}
-	
+
+	/**
+	 * Garantiza la estabilidad del sistema frente a inconsistencias
+	 * transaccionales. Valida que una peticion hacia una cuenta inexistente no
+	 * detenga el motor de calculo y simplemente obvie la metrica de antiguedad.
+	 */
 	@Test
 	@DisplayName("No debe sumar puntos si la cuenta destino no existe")
 	void calcularScore_CuentaDestinoInexistente_NoSumaAntiguedad() {
@@ -197,6 +242,11 @@ class FraudeScoreCalculatorTest {
 		assertEquals(0.0, score);
 	}
 
+	/**
+	 * Valida el manejo seguro de corrupcion de datos en capa de dominio. Si un
+	 * registro carece de fechas o datos obligatorios en su cliente vinculado, el
+	 * calculador ignora silenciosamente ese peso en lugar de fallar.
+	 */
 	@Test
 	@DisplayName("Debe manejar correctamente cliente o fecha de alta nulos")
 	void calcularScore_DatosClienteIncompletos_NoSumaAntiguedad() {

@@ -14,16 +14,16 @@ import com.banco.transacciones.domain.models.Transaccion;
 import com.banco.transacciones.dto.response.CicloReporte;
 
 /**
- * Clase de pruebas unitarias para la validación del algoritmo en {@link CicloTransaccionDetector}.
- * * Verifica la correcta detección de ciclos en grafos de transacciones, los cuales 
- * son un patrón fuertemente indicativo de esquemas de lavado de dinero.
- * * Se validan diferentes topologías de red (grafos dirigidos):
- * - Ausencia de transacciones (lista vacía).
- * - Cadenas lineales donde el dinero fluye sin retornar.
- * - Grafos Acíclicos Dirigidos (DAG): Múltiples rutas de origen a destino sin ciclos reales.
- * - Ciclos simples y complejos (ej. A -> B -> C -> A).
- * - Autociclos (transacciones hacia la misma cuenta).
- * - Grafos desconectados: Detección de una red fraudulenta oculta entre transacciones legítimas.
+ * Clase de pruebas unitarias para la validación del algoritmo en
+ * {@link CicloTransaccionDetector}. * Verifica la correcta detección de ciclos
+ * en grafos de transacciones, los cuales son un patrón fuertemente indicativo
+ * de esquemas de lavado de dinero. * Se validan diferentes topologías de red
+ * (grafos dirigidos): - Ausencia de transacciones (lista vacía). - Cadenas
+ * lineales donde el dinero fluye sin retornar. - Grafos Acíclicos Dirigidos
+ * (DAG): Múltiples rutas de origen a destino sin ciclos reales. - Ciclos
+ * simples y complejos (ej. A -> B -> C -> A). - Autociclos (transacciones hacia
+ * la misma cuenta). - Grafos desconectados: Detección de una red fraudulenta
+ * oculta entre transacciones legítimas.
  */
 class CicloTransaccionDetectorTest {
 
@@ -34,6 +34,11 @@ class CicloTransaccionDetectorTest {
 		detector = new CicloTransaccionDetector();
 	}
 
+	/**
+	 * Valida que el motor de grafos gestione correctamente colecciones vacias,
+	 * garantizando que la ausencia total de transacciones retorne un reporte limpio
+	 * sin provocar excepciones.
+	 */
 	@Test
 	@DisplayName("Debe retornar falso y lista vacía si no hay transacciones")
 	void detectar_ListaVacia_SinCiclo() {
@@ -43,6 +48,11 @@ class CicloTransaccionDetectorTest {
 		assertTrue(reporte.cuentasInvolucradas().isEmpty());
 	}
 
+	/**
+	 * Comprueba el comportamiento base unidireccional. Asegura que un flujo de
+	 * dinero estrictamente lineal, donde los fondos nunca retornan a un nodo
+	 * previo, sea ignorado por el detector de lavado.
+	 */
 	@Test
 	@DisplayName("Debe retornar falso para una cadena lineal (A -> B -> C -> D)")
 	void detectar_CadenaLineal_SinCiclo() {
@@ -53,6 +63,12 @@ class CicloTransaccionDetectorTest {
 		assertFalse(reporte.existeCiclo());
 	}
 
+	/**
+	 * Verifica la resiliencia contra falsos positivos en Grafos Aciclicos
+	 * Dirigidos. Asegura que los pagos multiples hacia un mismo destino desde una
+	 * raiz comun pero por diferentes intermediarios no se confundan con un ciclo
+	 * cerrado.
+	 */
 	@Test
 	@DisplayName("Debe ignorar aristas cruzadas simulando un falso ciclo (A->B, B->C, A->C)")
 	void detectar_GrafoAciclicoDirigido_SinCiclo() {
@@ -63,6 +79,11 @@ class CicloTransaccionDetectorTest {
 		assertFalse(reporte.existeCiclo(), "Un DAG no debe reportarse como ciclo de lavado de dinero");
 	}
 
+	/**
+	 * Comprueba la eficacia central del algoritmo DFS. Valida la deteccion exitosa
+	 * de un patron de triangulacion clasico de blanqueo de capitales, donde el
+	 * dinero retorna a la cuenta emisora original.
+	 */
 	@Test
 	@DisplayName("Debe detectar un ciclo de lavado simple (A -> B -> C -> A)")
 	void detectar_CicloSimple_RetornaTrue() {
@@ -77,6 +98,11 @@ class CicloTransaccionDetectorTest {
 				"El nodo de inicio y fin del reporte deben coincidir");
 	}
 
+	/**
+	 * Demuestra la capacidad del algoritmo para aislar y encontrar sub-redes
+	 * ilicitas. Asegura que una gran masa de transacciones legitimas y aisladas no
+	 * enmascare un ciclo fraudulento que ocurra en paralelo dentro del mismo lote.
+	 */
 	@Test
 	@DisplayName("Debe detectar un ciclo complejo en un grafo desconectado")
 	void detectar_GrafoDesconectadoConCiclo_RetornaTrue() {
@@ -94,6 +120,10 @@ class CicloTransaccionDetectorTest {
 		assertTrue(reporte.cuentasInvolucradas().contains("C3"));
 	}
 
+	/**
+	 * Verifica la identificacion de los autociclos. Evalua que las transferencias
+	 * enviadas directamente a la misma cuenta de origen marquen un ciclo evidente.
+	 */
 	@Test
 	@DisplayName("Debe detectar un auto-ciclo (A -> A)")
 	void detectar_AutoCiclo_RetornaTrue() {
@@ -105,6 +135,12 @@ class CicloTransaccionDetectorTest {
 		assertEquals(2, reporte.cuentasInvolucradas().size());
 	}
 
+	/**
+	 * Garantiza que la gestion de memoria de la pila DFS y los nodos visitados sea
+	 * impecable. Evita que patrones de flujo en diamante (bifurcacion y
+	 * unificacion) reporten ciclos inexistentes al visitar un mismo nodo varias
+	 * veces.
+	 */
 	@Test
 	@DisplayName("Debe manejar nodos duplicados en la pila de llamadas (cobertura estado 2)")
 	void detectar_DiamanteConDuplicadosEnPila_SinCiclo() {
