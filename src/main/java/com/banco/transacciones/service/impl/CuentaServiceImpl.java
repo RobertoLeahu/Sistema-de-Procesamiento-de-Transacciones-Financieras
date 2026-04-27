@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.banco.transacciones.domain.models.Cuenta;
 import com.banco.transacciones.domain.models.Transaccion;
 import com.banco.transacciones.dto.response.CuentaResumenDTO;
+import com.banco.transacciones.exception.CuentaNotFoundException;
 import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
 
@@ -46,7 +47,7 @@ public class CuentaServiceImpl {
 	@Transactional(readOnly = true)
 	public CuentaResumenDTO obtenerResumen(String numeroCuenta) {
 		Cuenta cuenta = cuentaRepository.findByNumeroCuenta(numeroCuenta)
-				.orElseThrow(() -> new RuntimeException("Cuenta no encontrada: " + numeroCuenta));
+				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada" + numeroCuenta));
 
 		List<Transaccion> historial = transaccionRepository.findByCuentaOrigenOrCuentaDestino(numeroCuenta,
 				numeroCuenta);
