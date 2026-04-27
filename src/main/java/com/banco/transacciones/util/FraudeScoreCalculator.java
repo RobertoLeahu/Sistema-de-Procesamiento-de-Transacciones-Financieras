@@ -1,6 +1,7 @@
 package com.banco.transacciones.util;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -29,6 +30,7 @@ public class FraudeScoreCalculator {
 
 	private final TransaccionRepository transaccionRepository;
 	private final CuentaRepository cuentaRepository;
+	private final Clock clock;
 
 	/**
 	 * Calcula el score de fraude asíncronamente. Complejidad: O(1) cálculos base,
@@ -37,7 +39,7 @@ public class FraudeScoreCalculator {
 	public double calcularScore(TransferenciaDTO request) {
 
 		double score = 0.0;
-		Instant ahora = Instant.now();
+		Instant ahora = clock.instant();
 
 		// Monto > 10.000
 		if (request.monto().compareTo(UMBRAL_MONTO) > 0) {

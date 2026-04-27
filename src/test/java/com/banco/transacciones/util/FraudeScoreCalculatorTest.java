@@ -4,17 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Optional;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +54,9 @@ class FraudeScoreCalculatorTest {
 
 	@Mock
 	private CuentaRepository cuentaRepository;
+	
+	@Mock
+    private Clock clock;
 
 	private MockedStatic<Instant> mockedInstant;
 
@@ -69,15 +71,10 @@ class FraudeScoreCalculatorTest {
 			.toInstant();
 
 	@BeforeEach
-	void setUp() {
-		mockedInstant = mockStatic(Instant.class, Mockito.CALLS_REAL_METHODS);
-		mockedInstant.when(Instant::now).thenReturn(INSTANT_DIURNO);
-	}
-
-	@AfterEach
-	void tearDown() {
-		mockedInstant.close();
-	}
+    void setUp() {
+        Mockito.lenient().when(clock.instant()).thenReturn(INSTANT_DIURNO);
+        Mockito.lenient().when(clock.getZone()).thenReturn(ZoneId.systemDefault());
+    }
 
 	@Test
 	@DisplayName("Debe retornar score 0.0 cuando ninguna regla de fraude se cumple")
@@ -95,8 +92,7 @@ class FraudeScoreCalculatorTest {
 	@DisplayName("Debe retornar score 1.0 cuando TODAS las reglas se cumplen")
 	void calcularScore_RiesgoMaximo_RetornaUno() {
 		// Cambiamos a horario nocturno
-		mockedInstant.when(Instant::now).thenReturn(INSTANT_NOCTURNO);
-
+		when(clock.instant()).thenReturn(INSTANT_NOCTURNO);
 		// Monto > 10,000 y país distinto al habitual ("FR")
 		TransferenciaDTO request = crearRequest(new BigDecimal("15000.00"), "FR");
 
@@ -121,7 +117,7 @@ class FraudeScoreCalculatorTest {
 	@Test
 	@DisplayName("Debe sumar 0.20 cuando la transacción es en horario nocturno")
 	void calcularScore_SoloHoraNocturna_SumaVeinte() {
-		mockedInstant.when(Instant::now).thenReturn(INSTANT_NOCTURNO);
+		when(clock.instant()).thenReturn(INSTANT_NOCTURNO);
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
 		configurarMocksBase(1, 10, PAIS_HABITUAL);
 
@@ -187,6 +183,36 @@ class FraudeScoreCalculatorTest {
 		double score = calculator.calcularScore(request);
 		assertEquals(0.10, score, 0.001);
 	}
+	
+	@Test
+	@DisplayName("No debe sumar puntos si la cuenta destino no existe")
+	void calcularScore_CuentaDestinoInexistente_NoSumaAntiguedad() {
+		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
+		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.empty());
+
+		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(any(), any())).thenReturn(0L);
+		when(transaccionRepository.findPaisHabitual(any())).thenReturn(Optional.of(PAIS_HABITUAL));
+
+		double score = calculator.calcularScore(request);
+		assertEquals(0.0, score);
+	}
+
+	@Test
+	@DisplayName("Debe manejar correctamente cliente o fecha de alta nulos")
+	void calcularScore_DatosClienteIncompletos_NoSumaAntiguedad() {
+		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
+
+		// Caso: Cliente nulo
+		Cuenta cuentaSinCliente = Cuenta.builder().cliente(null).build();
+		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.of(cuentaSinCliente));
+
+		// Evitamos que sume por otros motivos
+		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(any(), any())).thenReturn(0L);
+		when(transaccionRepository.findPaisHabitual(any())).thenReturn(Optional.of(PAIS_HABITUAL));
+
+		double score = calculator.calcularScore(request);
+		assertEquals(0.0, score, 0.001);
+	}
 
 	// --- MÉTODOS AUXILIARES ---
 	private TransferenciaDTO crearRequest(BigDecimal monto, String pais) {
@@ -203,7 +229,7 @@ class FraudeScoreCalculatorTest {
 
 		// Antigüedad Cuenta Destino
 		Cliente clienteMock = mock(Cliente.class);
-		LocalDate fechaAlta = LocalDate.ofInstant(Instant.now(), ZoneId.systemDefault()).minusDays(diasAntiguedad);
+		LocalDate fechaAlta = LocalDate.ofInstant(INSTANT_DIURNO, ZoneId.systemDefault()).minusDays(diasAntiguedad);
 		when(clienteMock.getFechaAlta()).thenReturn(fechaAlta);
 
 		Cuenta cuentaDestino = Cuenta.builder().numeroCuenta(CUENTA_DESTINO).cliente(clienteMock).build();
