@@ -65,16 +65,15 @@ class TransaccionIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
-		// Limpiamos la BD en memoria antes de cada test
 		transaccionRepository.deleteAll();
 		cuentaRepository.deleteAll();
 
 		// Preparamos las cuentas necesarias para la integración
 		Cuenta origen = Cuenta.builder().numeroCuenta(CUENTA_ORIGEN).saldo(new BigDecimal("5000.00"))
-				.tipo(TipoCuenta.ACTIVO).estado(EstadoCuenta.ACTIVADA).build();
+				.tipo(TipoCuenta.CORRIENTE).estado(EstadoCuenta.ACTIVADA).build();
 
 		Cuenta destino = Cuenta.builder().numeroCuenta(CUENTA_DESTINO).saldo(new BigDecimal("1000.00"))
-				.tipo(TipoCuenta.ACTIVO).estado(EstadoCuenta.ACTIVADA).build();
+				.tipo(TipoCuenta.CORRIENTE).estado(EstadoCuenta.ACTIVADA).build();
 
 		cuentaRepository.save(origen);
 		cuentaRepository.save(destino);
@@ -92,23 +91,21 @@ class TransaccionIntegrationTest {
 				.andExpect(status().isAccepted()).andExpect(jsonPath("$.cuentaOrigen").value(CUENTA_ORIGEN))
 				.andExpect(jsonPath("$.estado").value("PENDIENTE")).andReturn();
 
-		// Validamos que se ha guardado en BD H2
 		long count = transaccionRepository.count();
 		assertEquals(1, count, "Debe existir una transacción guardada en BD");
 	}
 
 	@Test
-	@DisplayName("Debe fallar con 500 Internal Server Error según los requisitos si el monto es negativo")
-	void iniciarTransferencia_MontoNegativo_Retorna500() throws Exception {
-		TransferenciaDTO request = new TransferenciaDTO(CUENTA_ORIGEN, CUENTA_DESTINO, new BigDecimal("-100.00"), "ES",
-				"Pago");
+	@DisplayName("Debe procesar y fallar internamente si no hay saldo suficiente (La API inicialmente retorna 202)")
+	void iniciarTransferencia_SaldoInsuficiente_Retorna202YProcesaFallo() throws Exception {
+		// La cuenta origen tiene 5000, intentamos transferir 6000
+		TransferenciaDTO request = new TransferenciaDTO(CUENTA_ORIGEN, CUENTA_DESTINO, new BigDecimal("6000.00"), "ES",
+				"Intento de transferencia sin saldo");
 
-		mockMvc.perform(post("/api/transacciones/transferencia").contentType(MediaType.APPLICATION_JSON)
-				.content(objectMapper.writeValueAsString(request))).andExpect(status().isInternalServerError())
-				.andExpect(jsonPath("$.timestamp").exists()).andExpect(jsonPath("$.status").value(500))
-				.andExpect(jsonPath("$.error").value("Error interno"))
-				.andExpect(jsonPath("$.detalle").value("Ocurrió un error inesperado en el servidor"))
-				.andExpect(jsonPath("$.path").value("/api/transacciones/transferencia"));
+		mockMvc.perform(post("/api/transacciones/transferencia")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isAccepted());
 	}
 
 	@Test

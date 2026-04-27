@@ -3,10 +3,8 @@ package com.banco.transacciones.service.impl;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,31 +46,18 @@ public class TransaccionServiceImpl {
 	 */
 	@Transactional
 	public TransaccionDTO iniciarTransferencia(TransferenciaDTO dto) {
-	    String correlationId = UUID.randomUUID().toString();
-	    MDC.put("correlationId", correlationId);
+		log.info("Iniciando transferencia - Origen: {}, Destino: {}, País: {}", dto.cuentaOrigen(), dto.cuentaDestino(),
+				dto.codigoPais());
 
-	    try {
-	        log.info("Iniciando transferencia - Origen: {}, Destino: {}, País: {}", 
-	                 dto.cuentaOrigen(), dto.cuentaDestino(), dto.codigoPais());
+		Transaccion tx = Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
+				.monto(dto.monto()).codigoPais(dto.codigoPais()).tipo(TipoTransaccion.TRANSFERENCIA)
+				.estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now()).build();
 
-	        Transaccion tx = Transaccion.builder()
-	                .cuentaOrigen(dto.cuentaOrigen())
-	                .cuentaDestino(dto.cuentaDestino())
-	                .monto(dto.monto())
-	                .codigoPais(dto.codigoPais())
-	                .tipo(TipoTransaccion.TRANSFERENCIA)
-	                .estado(EstadoTransaccion.PENDIENTE)
-	                .fechaHora(Instant.now())
-	                .build();
+		tx = transaccionRepository.save(tx);
 
-	        tx = transaccionRepository.save(tx);
+		transaccionProcesador.ejecutarTransferenciaAsync(dto, tx.getId());
 
-	        transaccionProcesador.ejecutarTransferenciaAsync(dto, tx.getId(), correlationId);
-
-	        return mapper.toResponse(tx);
-	    } finally {
-	        MDC.clear();
-	    }
+		return mapper.toResponse(tx);
 	}
 
 	/**
@@ -88,28 +73,21 @@ public class TransaccionServiceImpl {
 			throw new IllegalArgumentException("Máximo 500 transacciones por lote permitidas");
 		}
 
-		String correlationId = UUID.randomUUID().toString();
-		MDC.put("correlationId", correlationId);
+		log.info("Iniciando procesamiento de lote de {} transacciones", lote.size());
 
-		try {
-			log.info("Iniciando procesamiento de lote de {} transacciones", lote.size());
+		int size = 50;
+		List<CompletableFuture<ResumenLoteDTO>> futuros = new ArrayList<>();
 
-			int size = 50; // Partir en sublotes de 50
-			List<CompletableFuture<ResumenLoteDTO>> futuros = new ArrayList<>();
-
-			for (int i = 0; i < lote.size(); i += size) {
-				List<TransferenciaDTO> sublote = lote.subList(i, Math.min(i + size, lote.size()));
-				futuros.add(transaccionProcesador.procesarSubloteAsync(sublote, correlationId));
-			}
-
-			ResumenLoteDTO resumen = futuros.stream().map(CompletableFuture::join).reduce(new ResumenLoteDTO(0, 0, 0),
-					ResumenLoteDTO::sumar); //
-
-			log.info("Lote procesado. Exitosas: {}, Fallidas: {}", resumen.totalExitosas(), resumen.totalFallidas());
-			return resumen;
-		} finally {
-			MDC.clear();
+		for (int i = 0; i < lote.size(); i += size) {
+			List<TransferenciaDTO> sublote = lote.subList(i, Math.min(i + size, lote.size()));
+			futuros.add(transaccionProcesador.procesarSubloteAsync(sublote));
 		}
+
+		ResumenLoteDTO resumen = futuros.stream().map(CompletableFuture::join).reduce(new ResumenLoteDTO(0, 0, 0),
+				ResumenLoteDTO::sumar);
+
+		log.info("Lote procesado. Exitosas: {}, Fallidas: {}", resumen.totalExitosas(), resumen.totalFallidas());
+		return resumen;
 	}
 
 	/**
@@ -124,11 +102,6 @@ public class TransaccionServiceImpl {
 	 */
 	@Transactional(readOnly = true)
 	public TransaccionDTO obtenerEstadoTransaccion(Long id) {
-		// Aseguramos la trazabilidad incluso en operaciones de lectura
-		if (MDC.get("correlationId") == null) {
-			MDC.put("correlationId", UUID.randomUUID().toString());
-		}
-
 		log.info("Entrada: Consultando estado para TX ID: {}", id);
 
 		Transaccion tx = transaccionRepository.findById(id).orElseThrow(() -> {

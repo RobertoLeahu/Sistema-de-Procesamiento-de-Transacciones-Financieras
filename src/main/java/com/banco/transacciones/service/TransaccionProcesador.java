@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import org.slf4j.MDC;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -18,6 +17,7 @@ import com.banco.transacciones.domain.models.Cuenta;
 import com.banco.transacciones.domain.models.Transaccion;
 import com.banco.transacciones.dto.request.TransferenciaDTO;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
+import com.banco.transacciones.exception.SaldoInsuficienteException;
 import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
@@ -48,12 +48,10 @@ public class TransaccionProcesador {
 	 *
 	 * @param dto           Datos de la transferencia.
 	 * @param transaccionId ID de la transacción persistida previamente.
-	 * @param correlationId ID único de seguimiento para logs.
 	 */
 	@Async("transaccionExecutor")
 	@Transactional
-	public void ejecutarTransferenciaAsync(TransferenciaDTO dto, Long transaccionId, String correlationId) {
-		MDC.put("correlationId", correlationId);
+	public void ejecutarTransferenciaAsync(TransferenciaDTO dto, Long transaccionId) {
 		log.info("Iniciando procesamiento asíncrono para TX ID: {}", transaccionId);
 		try {
 			Transaccion tx = transaccionRepository.findById(transaccionId)
@@ -62,8 +60,6 @@ public class TransaccionProcesador {
 			procesarTransferenciaInternal(dto, tx);
 		} catch (Exception e) {
 			log.error("Fallo crítico en TX {}: {}", transaccionId, e.getMessage());
-		} finally {
-			MDC.clear();
 		}
 	}
 
@@ -78,9 +74,7 @@ public class TransaccionProcesador {
 	 */
 	@Async("transaccionExecutor")
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	public CompletableFuture<ResumenLoteDTO> procesarSubloteAsync(List<TransferenciaDTO> sublote,
-			String correlationId) {
-		MDC.put("correlationId", correlationId);
+	public CompletableFuture<ResumenLoteDTO> procesarSubloteAsync(List<TransferenciaDTO> sublote) {
 		int exitosas = 0;
 		int fallidas = 0;
 
@@ -94,7 +88,6 @@ public class TransaccionProcesador {
 				fallidas++;
 			}
 		}
-		MDC.clear();
 		return CompletableFuture.completedFuture(new ResumenLoteDTO(sublote.size(), exitosas, fallidas));
 	}
 
@@ -128,6 +121,13 @@ public class TransaccionProcesador {
 			Cuenta origen = origenPrimero ? cuenta1 : cuenta2;
 			Cuenta destino = origenPrimero ? cuenta2 : cuenta1;
 
+			// Validación de saldo
+			if (origen.getSaldo().compareTo(dto.monto()) < 0) {
+				tx.setEstado(EstadoTransaccion.RECHAZADA);
+				throw new SaldoInsuficienteException(
+						"La cuenta " + origen.getNumeroCuenta() + " no tiene saldo suficiente");
+			}
+
 			// 3. Validaciones y ejecución
 			if (riesgo > 0.75) {
 				tx.setEstado(EstadoTransaccion.RECHAZADA);
@@ -148,15 +148,9 @@ public class TransaccionProcesador {
 	 * Helper para inicializar una entidad Transaccion en procesos de lote.
 	 */
 	private Transaccion crearEntidadInicial(TransferenciaDTO dto) {
-	    return Transaccion.builder()
-	            .cuentaOrigen(dto.cuentaOrigen())
-	            .cuentaDestino(dto.cuentaDestino())
-	            .monto(dto.monto())
-	            .codigoPais(dto.codigoPais())
-	            .tipo(TipoTransaccion.TRANSFERENCIA)
-	            .estado(EstadoTransaccion.PENDIENTE)
-	            .fechaHora(Instant.now())
-	            .build();
+		return Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
+				.monto(dto.monto()).codigoPais(dto.codigoPais()).tipo(TipoTransaccion.TRANSFERENCIA)
+				.estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now()).build();
 	}
 
 	/**
@@ -164,10 +158,6 @@ public class TransaccionProcesador {
 	 */
 	private void generarAlerta(Transaccion tx, NivelRiesgo nivel, String motivo) {
 		alertaFraudeRepository
-				.save(AlertaFraude.builder()
-						.transaccion(tx)
-						.nivel(nivel).motivo(motivo)
-						.revisada(false)
-						.build());
+				.save(AlertaFraude.builder().transaccion(tx).nivel(nivel).motivo(motivo).revisada(false).build());
 	}
 }
