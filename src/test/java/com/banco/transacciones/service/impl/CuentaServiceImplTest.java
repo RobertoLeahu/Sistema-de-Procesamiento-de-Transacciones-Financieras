@@ -54,6 +54,11 @@ class CuentaServiceImplTest {
 				.cliente(clienteMock).build();
 	}
 
+	/**
+	 * Verifica que la generacion del resumen estadistico calcule con exactitud
+	 * matematica el total de movimientos, montos promedios, desviacion estandar y
+	 * la puntuacion de riesgo acumulado para una cuenta con historial activo.
+	 */
 	@Test
 	@DisplayName("Debe retornar resumen estadístico con cálculos matemáticos correctos")
 	void obtenerResumen_CuentaConTransacciones_CalculosCorrectos() {
@@ -87,6 +92,12 @@ class CuentaServiceImplTest {
 		assertEquals(0.7, result.puntuacionRiesgoAcumulada(), 0.001);
 	}
 
+	/**
+	 * Valida el comportamiento del sistema ante una cuenta sin historial de
+	 * transacciones. Asegura que los calculos matematicos se resuelvan de forma
+	 * segura devolviendo valores en cero, previniendo excepciones por division
+	 * entre cero o inconsistencias de datos.
+	 */
 	@Test
 	@DisplayName("Debe retornar resumen con promedios cero cuando no hay transacciones")
 	void obtenerResumen_CuentaSinTransacciones_RetornaCeros() {
@@ -108,19 +119,25 @@ class CuentaServiceImplTest {
 		assertEquals(0.0, result.puntuacionRiesgoAcumulada());
 	}
 
+	/**
+	 * Comprueba el manejo de excepciones de negocio en la capa de servicio.
+	 * Garantiza que se interrumpa el flujo y se lance una CuentaNotFoundException
+	 * cuando se solicita el resumen de un numero de cuenta no registrado en la base
+	 * de datos.
+	 */
 	@Test
-    @DisplayName("Debe lanzar CuentaNotFoundException si la cuenta no existe")
-    void obtenerResumen_CuentaNoExiste_LanzaExcepcion() {
-        // Arrange
-        String numeroCuenta = "ES_FALSA";
-        when(cuentaRepository.findByNumeroCuenta(numeroCuenta)).thenReturn(Optional.empty());
+	@DisplayName("Debe lanzar CuentaNotFoundException si la cuenta no existe")
+	void obtenerResumen_CuentaNoExiste_LanzaExcepcion() {
+		// Arrange
+		String numeroCuenta = "ES_FALSA";
+		when(cuentaRepository.findByNumeroCuenta(numeroCuenta)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        CuentaNotFoundException exception = assertThrows(CuentaNotFoundException.class, () -> {
-            cuentaService.obtenerResumen(numeroCuenta);
-        });
-        
-        assertTrue(exception.getMessage().contains("Cuenta no encontrada"));
-        verify(transaccionRepository, never()).findByCuentaOrigenOrCuentaDestino(anyString(), anyString());
-    }
+		// Act & Assert
+		CuentaNotFoundException exception = assertThrows(CuentaNotFoundException.class, () -> {
+			cuentaService.obtenerResumen(numeroCuenta);
+		});
+
+		assertTrue(exception.getMessage().contains("Cuenta no encontrada"));
+		verify(transaccionRepository, never()).findByCuentaOrigenOrCuentaDestino(anyString(), anyString());
+	}
 }
