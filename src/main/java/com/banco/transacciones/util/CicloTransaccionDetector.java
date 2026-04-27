@@ -25,12 +25,8 @@ public class CicloTransaccionDetector {
 		Map<String, Integer> estados = new HashMap<>(); // 0: no visitado, 1: visitando, 2: visitado
 		Map<String, String> padres = new HashMap<>();
 
-		for (String nodo : grafo.keySet()) {
-			estados.put(nodo, 0);
-		}
-
 		for (String nodoInicial : grafo.keySet()) {
-			if (estados.get(nodoInicial) == 0) {
+			if (estados.getOrDefault(nodoInicial, 0) == 0) {
 				CicloReporte reporte = dfsIterativo(nodoInicial, grafo, estados, padres);
 				if (reporte.existeCiclo()) {
 					return reporte; // Retorna rápido al primer ciclo
@@ -56,10 +52,11 @@ public class CicloTransaccionDetector {
 
 		while (!pila.isEmpty()) {
 			String actual = pila.peek();
+			int estadoActual = estados.getOrDefault(actual, 0);
 
-			if (estados.get(actual) == 0) {
+			if (estadoActual == 0) {
 				estados.put(actual, 1); // Visitando
-			} else if (estados.get(actual) == 1) {
+			} else if (estadoActual == 1) {
 				estados.put(actual, 2); // Completamente visitado
 				pila.pop();
 				continue;
@@ -69,10 +66,12 @@ public class CicloTransaccionDetector {
 			}
 
 			for (String vecino : grafo.getOrDefault(actual, Collections.emptyList())) {
-				if (estados.get(vecino) == 0) {
+				int estadoVecino = estados.getOrDefault(vecino, 0);
+
+				if (estadoVecino == 0) {
 					padres.put(vecino, actual);
 					pila.push(vecino);
-				} else if (estados.get(vecino) == 1) { // Back-edge encontrado = Ciclo
+				} else if (estadoVecino == 1) { // Back-edge encontrado = Ciclo
 					return reconstruirCiclo(actual, vecino, padres);
 				}
 			}

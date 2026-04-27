@@ -56,8 +56,6 @@ class CicloTransaccionDetectorTest {
 	@Test
 	@DisplayName("Debe ignorar aristas cruzadas simulando un falso ciclo (A->B, B->C, A->C)")
 	void detectar_GrafoAciclicoDirigido_SinCiclo() {
-		// En este grafo cerrado, el dinero fluye de A hacia C por dos vías, pero nunca
-		// retorna. No es lavado.
 		List<Transaccion> txs = List.of(tx("A", "B"), tx("B", "C"), tx("A", "C"));
 
 		CicloReporte reporte = detector.detectar(txs);
@@ -73,8 +71,6 @@ class CicloTransaccionDetectorTest {
 		CicloReporte reporte = detector.detectar(txs);
 
 		assertTrue(reporte.existeCiclo());
-		// El ciclo A-B-C-A tiene 4 elementos. El primero y el último deben ser la misma
-		// cuenta.
 		assertEquals(4, reporte.cuentasInvolucradas().size());
 		assertEquals(reporte.cuentasInvolucradas().get(0),
 				reporte.cuentasInvolucradas().get(reporte.cuentasInvolucradas().size() - 1),
@@ -93,7 +89,6 @@ class CicloTransaccionDetectorTest {
 		CicloReporte reporte = detector.detectar(txs);
 
 		assertTrue(reporte.existeCiclo());
-		// Debe haber aislado e identificado las cuentas de la Red B
 		assertTrue(reporte.cuentasInvolucradas().contains("C1"));
 		assertTrue(reporte.cuentasInvolucradas().contains("C2"));
 		assertTrue(reporte.cuentasInvolucradas().contains("C3"));
@@ -110,9 +105,19 @@ class CicloTransaccionDetectorTest {
 		assertEquals(2, reporte.cuentasInvolucradas().size());
 	}
 
+	@Test
+	@DisplayName("Debe manejar nodos duplicados en la pila de llamadas (cobertura estado 2)")
+	void detectar_DiamanteConDuplicadosEnPila_SinCiclo() {
+		List<Transaccion> txs = List.of(tx("Raiz", "Rama1"), tx("Raiz", "Rama2"), tx("Rama1", "DestinoFinal"),
+				tx("Rama2", "DestinoFinal"));
+
+		CicloReporte reporte = detector.detectar(txs);
+
+		assertFalse(reporte.existeCiclo(), "Un flujo en diamante no es un ciclo");
+	}
+
 	/**
 	 * Helper pattern para instanciar transacciones rápidamente sin Lombok builder
-	 * verboso
 	 */
 	private Transaccion tx(String origen, String destino) {
 		Transaccion t = new Transaccion();
