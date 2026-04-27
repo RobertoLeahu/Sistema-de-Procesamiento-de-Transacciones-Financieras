@@ -27,6 +27,14 @@ public class GlobalExceptionHandler {
 		return buildResponse(HttpStatus.BAD_REQUEST, "Saldo insuficiente", ex.getMessage(), request);
 	}
 
+	@ExceptionHandler(CuentaNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleCuentaNotFoundException(CuentaNotFoundException ex,
+			HttpServletRequest request) {
+		log.warn("Cuenta no encontrada: {} en el path: {}", ex.getMessage(), request.getRequestURI());
+		// Retorna 404 Not Found
+		return buildResponse(HttpStatus.NOT_FOUND, "Cuenta no encontrada", ex.getMessage(), request);
+	}
+
 	@ExceptionHandler(CuentaBloqueadaException.class)
 	public ResponseEntity<ErrorResponse> handleCuentaBloqueada(CuentaBloqueadaException ex,
 			HttpServletRequest request) {
