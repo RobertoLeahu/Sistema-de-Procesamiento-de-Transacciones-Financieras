@@ -66,7 +66,7 @@ class TransaccionProcesadorTest {
 
 	private static final String CUENTA_ORIGEN = "ES1234567890123456789012";
 	private static final String CUENTA_DESTINO = "ES9876543210987654321098";
-	private final String PAIS_HABITUAL = "ES";
+	private static final String PAIS_HABITUAL = "ES";
 
 	@BeforeEach
 	void setUp() {
