@@ -50,7 +50,9 @@ public class TransaccionProcesador {
 	 * @param transaccionId ID de la transacción persistida previamente.
 	 */
 	@Async("transaccionExecutor")
-	@Transactional
+	// SOLUCIÓN: Evitamos el Rollback explícitamente para excepciones de negocio
+	// controladas
+	@Transactional(noRollbackFor = { SaldoInsuficienteException.class })
 	public void ejecutarTransferenciaAsync(TransferenciaDTO dto, Long transaccionId) {
 		log.info("Iniciando procesamiento asíncrono para TX ID: {}", transaccionId);
 		try {
@@ -68,12 +70,11 @@ public class TransaccionProcesador {
 	 * PROPAGATION_REQUIRES_NEW para asegurar que el fallo de una transacción no
 	 * comprometa la atomicidad de las demás dentro del mismo hilo.
 	 *
-	 * @param sublote       Lista de hasta 50 transferencias.
-	 * @param correlationId ID de seguimiento.
+	 * @param sublote Lista de hasta 50 transferencias.
 	 * @return CompletableFuture con el resumen del procesamiento del sublote.
 	 */
 	@Async("transaccionExecutor")
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	@Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = { SaldoInsuficienteException.class })
 	public CompletableFuture<ResumenLoteDTO> procesarSubloteAsync(List<TransferenciaDTO> sublote) {
 		int exitosas = 0;
 		int fallidas = 0;
@@ -110,7 +111,7 @@ public class TransaccionProcesador {
 		tx.setRiesgoFraude(riesgo);
 
 		try {
-			// 2. Bloqueo Pesimista
+			// 2. Bloqueo Pesimista (Ordenado para evitar Deadlocks)
 			boolean origenPrimero = dto.cuentaOrigen().compareTo(dto.cuentaDestino()) < 0;
 			String c1 = origenPrimero ? dto.cuentaOrigen() : dto.cuentaDestino();
 			String c2 = origenPrimero ? dto.cuentaDestino() : dto.cuentaOrigen();
@@ -137,8 +138,6 @@ public class TransaccionProcesador {
 				destino.setSaldo(destino.getSaldo().add(dto.monto()));
 				tx.setEstado(EstadoTransaccion.COMPLETADA);
 			}
-		} catch (Exception e) {
-			throw e;
 		} finally {
 			transaccionRepository.save(tx);
 		}
