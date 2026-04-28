@@ -59,8 +59,8 @@ class TransaccionIntegrationTest {
 	@Autowired
 	private TransaccionRepository transaccionRepository;
 
-	private final String CUENTA_ORIGEN = "ES1234567890123456789012";
-	private final String CUENTA_DESTINO = "ES9876543210987654321098";
+	private static final String CUENTA_ORIGEN = "ES1234567890123456789012";
+	private static final String CUENTA_DESTINO = "ES9876543210987654321098";
 
 	@BeforeEach
 	void setUp() {
