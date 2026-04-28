@@ -54,15 +54,17 @@ public class CicloTransaccionDetector {
 			String actual = pila.peek();
 			int estadoActual = estados.getOrDefault(actual, 0);
 
-			if (estadoActual == 0) {
-				estados.put(actual, 1); // Visitando
-			} else if (estadoActual == 1) {
+			switch (estadoActual) {
+			case 0 -> estados.put(actual, 1); // Visitando
+			case 1 -> {
 				estados.put(actual, 2); // Completamente visitado
 				pila.pop();
 				continue;
-			} else {
-				pila.pop();
-				continue;
+			}
+				default -> {
+					pila.pop();
+					continue;
+				}
 			}
 
 			for (String vecino : grafo.getOrDefault(actual, Collections.emptyList())) {
