@@ -29,6 +29,12 @@ class CuentaRiesgoComparatorTest {
 		comparator = new CuentaRiesgoComparator();
 	}
 
+	/**
+	 * Valida el cumplimiento del criterio principal de ordenamiento. Asegura que
+	 * las cuentas con una puntuacion de riesgo acumulada mayor se posicionen con
+	 * prioridad absoluta en la cabecera de la lista, garantizando la visibilidad
+	 * inmediata de las amenazas.
+	 */
 	@Test
 	@DisplayName("Debe ordenar por score de riesgo de forma descendente")
 	void compare_PorScoreDeRiesgo_Exito() {
@@ -42,6 +48,11 @@ class CuentaRiesgoComparatorTest {
 		assertTrue(resultadoInverso > 0, "La cuenta con menor riesgo debe posicionarse despues");
 	}
 
+	/**
+	 * Comprueba la aplicacion del primer mecanismo de desempate. Garantiza que,
+	 * ante una igualdad matematica en el score de riesgo, la cantidad de alertas
+	 * criticas asuma el peso decisivo para determinar la prioridad.
+	 */
 	@Test
 	@DisplayName("Debe desempatar por alertas criticas si el score es exactamente igual")
 	void compare_EmpateEnScore_DesempataPorAlertas() {
@@ -52,6 +63,12 @@ class CuentaRiesgoComparatorTest {
 		assertTrue(resultado < 0, "A igual score, la cuenta con mas alertas criticas debe ir primero");
 	}
 
+	/**
+	 * Verifica el ultimo nivel de resolucion de empates. Asegura que si dos cuentas
+	 * presentan exactamente el mismo nivel de riesgo y la misma cantidad de
+	 * alertas, el sistema priorice a las cuentas de creacion mas reciente al
+	 * considerarlas de mayor volatilidad.
+	 */
 	@Test
 	@DisplayName("Debe desempatar por antiguedad (mas nuevas primero) si score y alertas empatan")
 	void compare_EmpateEnScoreYAlertas_DesempataPorAntiguedad() {
@@ -63,6 +80,13 @@ class CuentaRiesgoComparatorTest {
 		assertTrue(resultado < 0, "A igual score y alertas, la cuenta de creacion mas reciente debe ir primero");
 	}
 
+	/**
+	 * Valida la robustez del comparador frente a la ausencia o corrupcion de datos.
+	 * Garantiza que los valores nulos en el score de riesgo sean interceptados y
+	 * tratados de forma matematicamente segura como un riesgo nulo (0.0),
+	 * previniendo interrupciones por NullPointerException en la capa de
+	 * presentacion.
+	 */
 	@Test
 	@DisplayName("Debe manejar valores nulos en el score asumiendo riesgo 0.0")
 	void compare_ValoresNulosEnScore_AsumeCero() {
