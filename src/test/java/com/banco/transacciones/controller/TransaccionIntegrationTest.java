@@ -17,7 +17,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 import com.banco.transacciones.domain.enums.EstadoCuenta;
 import com.banco.transacciones.domain.enums.TipoCuenta;
@@ -28,20 +27,20 @@ import com.banco.transacciones.repository.TransaccionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Clase de pruebas de integración para el controlador de transacciones.
- * * Valida el flujo completo de extremo a extremo (End-to-End) de las peticiones HTTP 
- * utilizando {@link MockMvc}, abarcando desde la recepción del JSON hasta la 
- * persistencia en la base de datos en memoria.
- * * Escenarios principales evaluados:
- * - Flujo exitoso (Happy Path): Recepción de la transferencia, retorno de código HTTP 202 
- * y guardado en base de datos con estado PENDIENTE.
- * - Manejo de reglas de negocio: Rechazo de transferencias con montos negativos 
- * (validando la respuesta HTTP 500 y su estructura de error específica).
- * - Consultas de estado: Comprobación de respuestas HTTP 404 al buscar 
- * identificadores de transacción que no existen en el sistema.
- * * Nota técnica: Se utiliza la anotación {@code @ActiveProfiles("test")} para cargar 
- * la configuración exclusiva de pruebas. El método {@code setUp()} garantiza un entorno 
- * limpio truncando las tablas e insertando cuentas base antes de cada ejecución.
+ * Clase de pruebas de integración para el controlador de transacciones. *
+ * Valida el flujo completo de extremo a extremo (End-to-End) de las peticiones
+ * HTTP utilizando {@link MockMvc}, abarcando desde la recepción del JSON hasta
+ * la persistencia en la base de datos en memoria. * Escenarios principales
+ * evaluados: - Flujo exitoso (Happy Path): Recepción de la transferencia,
+ * retorno de código HTTP 202 y guardado en base de datos con estado PENDIENTE.
+ * - Manejo de reglas de negocio: Rechazo de transferencias con montos negativos
+ * (validando la respuesta HTTP 500 y su estructura de error específica). -
+ * Consultas de estado: Comprobación de respuestas HTTP 404 al buscar
+ * identificadores de transacción que no existen en el sistema. * Nota técnica:
+ * Se utiliza la anotación {@code @ActiveProfiles("test")} para cargar la
+ * configuración exclusiva de pruebas. El método {@code setUp()} garantiza un
+ * entorno limpio truncando las tablas e insertando cuentas base antes de cada
+ * ejecución.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -85,11 +84,10 @@ class TransaccionIntegrationTest {
 		TransferenciaDTO request = new TransferenciaDTO(CUENTA_ORIGEN, CUENTA_DESTINO, new BigDecimal("500.00"), "ES",
 				"Pago alquiler");
 
-		MvcResult result = mockMvc
-				.perform(post("/api/transacciones/transferencia").contentType(MediaType.APPLICATION_JSON)
-						.content(objectMapper.writeValueAsString(request)))
-				.andExpect(status().isAccepted()).andExpect(jsonPath("$.cuentaOrigen").value(CUENTA_ORIGEN))
-				.andExpect(jsonPath("$.estado").value("PENDIENTE")).andReturn();
+		mockMvc.perform(post("/api/transacciones/transferencia").contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(request))).andExpect(status().isAccepted())
+				.andExpect(jsonPath("$.cuentaOrigen").value(CUENTA_ORIGEN))
+				.andExpect(jsonPath("$.estado").value("PENDIENTE"));
 
 		long count = transaccionRepository.count();
 		assertEquals(1, count, "Debe existir una transacción guardada en BD");
@@ -102,10 +100,8 @@ class TransaccionIntegrationTest {
 		TransferenciaDTO request = new TransferenciaDTO(CUENTA_ORIGEN, CUENTA_DESTINO, new BigDecimal("6000.00"), "ES",
 				"Intento de transferencia sin saldo");
 
-		mockMvc.perform(post("/api/transacciones/transferencia")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(objectMapper.writeValueAsString(request)))
-				.andExpect(status().isAccepted());
+		mockMvc.perform(post("/api/transacciones/transferencia").contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(request))).andExpect(status().isAccepted());
 	}
 
 	@Test
