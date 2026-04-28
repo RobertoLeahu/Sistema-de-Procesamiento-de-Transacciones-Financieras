@@ -63,9 +63,9 @@ class FraudeScoreCalculatorTest {
 	private final String PAIS_HABITUAL = "ES";
 
 	// Fechas estáticas para evitar Flaky Tests
-	private final Instant INSTANT_DIURNO = ZonedDateTime.of(2026, 4, 7, 14, 0, 0, 0, ZoneId.systemDefault())
+	private static final Instant INSTANT_DIURNO = ZonedDateTime.of(2026, 4, 7, 14, 0, 0, 0, ZoneId.systemDefault())
 			.toInstant();
-	private final Instant INSTANT_NOCTURNO = ZonedDateTime.of(2026, 4, 7, 3, 0, 0, 0, ZoneId.systemDefault())
+	private static final Instant INSTANT_NOCTURNO = ZonedDateTime.of(2026, 4, 7, 3, 0, 0, 0, ZoneId.systemDefault())
 			.toInstant();
 
 	@BeforeEach
