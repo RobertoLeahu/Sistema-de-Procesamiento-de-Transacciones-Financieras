@@ -27,14 +27,19 @@ import com.banco.transacciones.repository.TransaccionRepository;
 import com.banco.transacciones.util.FraudeScoreCalculator;
 
 /**
- * Clase de pruebas unitarias para la validacion del motor de ejecucion concurrente en TransaccionProcesador.
- * Verifica la integridad transaccional, la prevencion de condiciones de carrera (Deadlocks) y la 
- * aplicacion estricta de las politicas de seguridad financiera.
- * * Flujos criticos validados:
- * - Prevencion de concurrencia: Verificacion del acceso exclusivo a los datos de las cuentas mediante simulacion de bloqueos pesimistas en base de datos.
- * - Integracion de Riesgos: Evaluacion de transferencias contra el orquestador de fraude, asegurando el bloqueo y generacion de alertas ante scores que superen el umbral critico.
- * - Consistencia contable: Validacion matematica estricta de disponibilidad de fondos antes de efectuar mutaciones en los saldos.
- * - Transicion de estados: Garantia de que el ciclo de vida de la transaccion finalice correctamente (COMPLETADA o RECHAZADA) tras la fase de procesamiento, incluyendo la correcta persistencia en el bloque finally.
+ * Clase de pruebas unitarias para la validacion del motor de ejecucion
+ * concurrente en TransaccionProcesador. Verifica la integridad transaccional,
+ * la prevencion de condiciones de carrera (Deadlocks) y la aplicacion estricta
+ * de las politicas de seguridad financiera. * Flujos criticos validados: -
+ * Prevencion de concurrencia: Verificacion del acceso exclusivo a los datos de
+ * las cuentas mediante simulacion de bloqueos pesimistas en base de datos. -
+ * Integracion de Riesgos: Evaluacion de transferencias contra el orquestador de
+ * fraude, asegurando el bloqueo y generacion de alertas ante scores que superen
+ * el umbral critico. - Consistencia contable: Validacion matematica estricta de
+ * disponibilidad de fondos antes de efectuar mutaciones en los saldos. -
+ * Transicion de estados: Garantia de que el ciclo de vida de la transaccion
+ * finalice correctamente (COMPLETADA o RECHAZADA) tras la fase de
+ * procesamiento, incluyendo la correcta persistencia en el bloque finally.
  */
 @ExtendWith(MockitoExtension.class)
 class TransaccionProcesadorTest {
@@ -59,8 +64,8 @@ class TransaccionProcesadorTest {
 	private Cuenta cuentaOrigen;
 	private Cuenta cuentaDestino;
 
-	private final String CUENTA_ORIGEN = "ES1234567890123456789012";
-	private final String CUENTA_DESTINO = "ES9876543210987654321098";
+	private static final String CUENTA_ORIGEN = "ES1234567890123456789012";
+	private static final String CUENTA_DESTINO = "ES9876543210987654321098";
 	private final String PAIS_HABITUAL = "ES";
 
 	@BeforeEach

@@ -36,14 +36,19 @@ import com.banco.transacciones.repository.TransaccionRepository;
 import com.banco.transacciones.service.TransaccionProcesador;
 
 /**
- * Clase de pruebas unitarias para la validacion de la capa de orquestacion en TransaccionServiceImpl.
- * Verifica la correcta gestion del ciclo de vida inicial de las transacciones y su enrutamiento 
- * hacia los motores de ejecucion asincrona, garantizando tiempos de respuesta optimos en la API.
- * * Escenarios arquitectonicos y de negocio validados:
- * - Delegacion asincrona: Persistencia del estado PENDIENTE y pase de control al procesador sin bloquear el hilo principal.
- * - Procesamiento masivo (Lotes): Division matematica de cargas grandes en sublotes manejables (tamano 50) para no saturar el ThreadPool.
- * - Proteccion de memoria (Circuit Breaker logico): Rechazo inmediato y lanzamiento de excepcion si el payload supera el limite estricto de 500 transacciones.
- * - Consultas transaccionales: Recuperacion limpia de estados mediante transacciones de solo lectura y correcto manejo de identidades inexistentes (TransaccionNotFoundException).
+ * Clase de pruebas unitarias para la validacion de la capa de orquestacion en
+ * TransaccionServiceImpl. Verifica la correcta gestion del ciclo de vida
+ * inicial de las transacciones y su enrutamiento hacia los motores de ejecucion
+ * asincrona, garantizando tiempos de respuesta optimos en la API. * Escenarios
+ * arquitectonicos y de negocio validados: - Delegacion asincrona: Persistencia
+ * del estado PENDIENTE y pase de control al procesador sin bloquear el hilo
+ * principal. - Procesamiento masivo (Lotes): Division matematica de cargas
+ * grandes en sublotes manejables (tamano 50) para no saturar el ThreadPool. -
+ * Proteccion de memoria (Circuit Breaker logico): Rechazo inmediato y
+ * lanzamiento de excepcion si el payload supera el limite estricto de 500
+ * transacciones. - Consultas transaccionales: Recuperacion limpia de estados
+ * mediante transacciones de solo lectura y correcto manejo de identidades
+ * inexistentes (TransaccionNotFoundException).
  */
 @ExtendWith(MockitoExtension.class)
 class TransaccionServiceImplTest {
@@ -63,12 +68,13 @@ class TransaccionServiceImplTest {
 	private TransferenciaDTO transferenciaDTO;
 	private Transaccion transaccionMock;
 
-	private final String CUENTA_ORIGEN = "ES1234567890123456789012";
-	private final String CUENTA_DESTINO = "ES9876543210987654321098";
+	private static final String CUENTA_ORIGEN = "ES1234567890123456789012";
+	private static final String CUENTA_DESTINO = "ES9876543210987654321098";
+	private final String PAIS_HABITUAL = "ES";
 
 	@BeforeEach
 	void setUp() {
-		transferenciaDTO = new TransferenciaDTO(CUENTA_ORIGEN, CUENTA_DESTINO, new BigDecimal("100.00"), "ES",
+		transferenciaDTO = new TransferenciaDTO(CUENTA_ORIGEN, CUENTA_DESTINO, new BigDecimal("100.00"), PAIS_HABITUAL,
 				"Transferencia de prueba");
 		transaccionMock = Transaccion.builder().id(1L).estado(EstadoTransaccion.PENDIENTE).build();
 	}
