@@ -3,10 +3,13 @@ package com.banco.transacciones.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +24,7 @@ import com.banco.transacciones.domain.models.AlertaFraude;
 import com.banco.transacciones.domain.models.Cuenta;
 import com.banco.transacciones.domain.models.Transaccion;
 import com.banco.transacciones.dto.request.TransferenciaDTO;
+import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
@@ -150,5 +154,97 @@ class TransaccionProcesadorTest {
 
 		// Assert
 		assertEquals(EstadoTransaccion.RECHAZADA, tx.getEstado());
+	}
+
+	/**
+	 * Valida la cobertura de la rama secundaria del algoritmo de prevencion de
+	 * deadlocks. Asegura que cuando la cuenta de destino es alfabeticamente menor
+	 * que la de origen, los bloqueos pesimistas se soliciten en el orden inverso
+	 * correcto para evitar abrazos mortales en la base de datos.
+	 */
+	@Test
+	@DisplayName("Debe ordenar cuentas inversamente para prevenir deadlocks (Destino < Origen)")
+	void ejecutarTransferencia_OrdenInversoCuentas_Exito() {
+		// Arrange: "Z" es mayor que "A", por lo que origenPrimero será false
+		TransferenciaDTO dtoInverso = new TransferenciaDTO("Z_CUENTA", "A_CUENTA", new BigDecimal("100.00"), "ES",
+				"Test Inverso");
+		when(transaccionRepository.findById(1L)).thenReturn(Optional.of(tx));
+		when(fraudeScoreCalculator.calcularScore(any(TransferenciaDTO.class))).thenReturn(0.1);
+
+		Cuenta cuentaZ = Cuenta.builder().numeroCuenta("Z_CUENTA").saldo(new BigDecimal("500.00")).build();
+		Cuenta cuentaA = Cuenta.builder().numeroCuenta("A_CUENTA").saldo(new BigDecimal("100.00")).build();
+
+		// El procesador pedirá primero A_CUENTA y luego Z_CUENTA
+		when(cuentaRepository.findByNumeroCuentaWithLock("A_CUENTA")).thenReturn(Optional.of(cuentaA));
+		when(cuentaRepository.findByNumeroCuentaWithLock("Z_CUENTA")).thenReturn(Optional.of(cuentaZ));
+
+		// Act
+		transaccionProcesador.ejecutarTransferenciaAsync(dtoInverso, 1L);
+
+		// Assert
+		assertEquals(EstadoTransaccion.COMPLETADA, tx.getEstado());
+		assertEquals(new BigDecimal("400.00"), cuentaZ.getSaldo());
+		assertEquals(new BigDecimal("200.00"), cuentaA.getSaldo());
+	}
+
+	/**
+	 * Comprueba la robustez del procesamiento asincrono frente a inconsistencias de
+	 * datos. Garantiza que si el ID de transaccion proporcionado no existe en la
+	 * base de datos, el hilo aborte limpiamente lanzando la excepcion adecuada.
+	 */
+	@Test
+	@DisplayName("Debe abortar silenciosamente si la transacción inicial no existe")
+	void ejecutarTransferencia_TransaccionNoExiste_AbortaProceso() {
+		// Arrange
+		when(transaccionRepository.findById(99L)).thenReturn(Optional.empty());
+
+		// Act
+		transaccionProcesador.ejecutarTransferenciaAsync(dto, 99L);
+
+		// Assert
+		verify(transaccionRepository).findById(99L);
+
+		verifyNoInteractions(cuentaRepository);
+		verifyNoInteractions(fraudeScoreCalculator);
+	}
+
+	/**
+	 * Valida el motor de procesamiento por lotes (Batch). Verifica que una lista de
+	 * transferencias se itere correctamente, persistiendo las entidades iniciales y
+	 * que las excepciones individuales (ej. cuenta no encontrada) no detengan el
+	 * bucle, sumando con precision los casos de exito y fracaso en el resumen.
+	 */
+	@Test
+	@DisplayName("Debe procesar un sublote mixto sumando exitosas y fallidas")
+	void procesarSubloteAsync_LoteMixto_RetornaResumen() throws Exception {
+		// Arrange: Un DTO válido (el del setUp) y uno inválido
+		TransferenciaDTO dtoInvalido = new TransferenciaDTO("CUENTA_ERRONEA", CUENTA_DESTINO, new BigDecimal("50.00"),
+				"ES", "Test Error");
+		List<TransferenciaDTO> sublote = List.of(dto, dtoInvalido);
+
+		// Simulamos el guardado de la entidad inicial (crearEntidadInicial)
+		when(transaccionRepository.save(any(Transaccion.class))).thenAnswer(invocation -> {
+			Transaccion t = invocation.getArgument(0);
+			t.setId(System.nanoTime()); // ID simulado para que no sea null
+			return t;
+		});
+
+		// Simulamos que el DTO 1 pasa bien
+		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.1);
+		when(cuentaRepository.findByNumeroCuentaWithLock(CUENTA_ORIGEN)).thenReturn(Optional.of(cuentaOrigen));
+		when(cuentaRepository.findByNumeroCuentaWithLock(CUENTA_DESTINO)).thenReturn(Optional.of(cuentaDestino));
+
+		// Simulamos que el DTO 2 falla porque la cuenta no existe
+		when(fraudeScoreCalculator.calcularScore(dtoInvalido)).thenReturn(0.1);
+		when(cuentaRepository.findByNumeroCuentaWithLock("CUENTA_ERRONEA")).thenReturn(Optional.empty());
+
+		// Act
+		CompletableFuture<ResumenLoteDTO> future = transaccionProcesador.procesarSubloteAsync(sublote);
+		ResumenLoteDTO resumen = future.get(); // Esperamos a que termine el hilo
+
+		// Assert
+		assertEquals(2, resumen.totalRecibidas());
+		assertEquals(1, resumen.totalExitosas());
+		assertEquals(1, resumen.totalFallidas());
 	}
 }
