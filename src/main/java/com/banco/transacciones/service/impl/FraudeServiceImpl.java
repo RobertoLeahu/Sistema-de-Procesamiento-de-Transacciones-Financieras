@@ -35,7 +35,7 @@ public class FraudeServiceImpl {
 	@Transactional(readOnly = true)
 	public Page<AlertaFraudeDTO> obtenerAlertasNoRevisadas(Pageable pageable) {
 		log.info("Consultando alertas de fraude pendientes");
-		return alertaFraudeRepository.findByRevisadaFalse(pageable).map(alerta -> alertaFraudeMapper.toDto(alerta));
+		return alertaFraudeRepository.findByRevisadaFalse(pageable).map(alertaFraudeMapper::toDto);
 	}
 
 	/**
