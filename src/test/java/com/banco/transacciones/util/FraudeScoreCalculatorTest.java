@@ -59,8 +59,6 @@ class FraudeScoreCalculatorTest {
 	@Mock
 	private Clock clock;
 
-	private MockedStatic<Instant> mockedInstant;
-
 	private final String CUENTA_ORIGEN = "ES1234567890123456789012";
 	private final String CUENTA_DESTINO = "ES9876543210987654321098";
 	private final String PAIS_HABITUAL = "ES";
