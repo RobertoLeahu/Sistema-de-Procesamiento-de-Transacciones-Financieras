@@ -94,8 +94,7 @@ class CuentaRiesgoComparatorTest {
 		CuentaResumenDTO cuentaConRiesgoNulo2 = crearDTO(null, 0, LocalDate.now());
 		CuentaResumenDTO cuentaConRiesgoBajo = crearDTO(0.1, 0, LocalDate.now());
 
-		// Al comparar dos nulos, ambos se evalúan como 0.0 y terminan empatando en todo
-		// (resultado 0)
+		// Al comparar dos nulos, ambos se evalúan como 0.0 y terminan empatando en todo (resultado 0)
 		int empate = comparator.compare(cuentaConRiesgoNulo1, cuentaConRiesgoNulo2);
 		assertEquals(0, empate, "Dos scores nulos deben ser tratados como iguales (0.0)");
 

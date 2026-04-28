@@ -58,9 +58,9 @@ class FraudeScoreCalculatorTest {
 	@Mock
 	private Clock clock;
 
-	private final String CUENTA_ORIGEN = "ES1234567890123456789012";
-	private final String CUENTA_DESTINO = "ES9876543210987654321098";
-	private final String PAIS_HABITUAL = "ES";
+	private static final String CUENTA_ORIGEN = "ES1234567890123456789012";
+	private static final String CUENTA_DESTINO = "ES9876543210987654321098";
+	private static final String PAIS_HABITUAL = "ES";
 
 	// Fechas estáticas para evitar Flaky Tests
 	private static final Instant INSTANT_DIURNO = ZonedDateTime.of(2026, 4, 7, 14, 0, 0, 0, ZoneId.systemDefault())
