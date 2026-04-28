@@ -54,28 +54,25 @@ public class CicloTransaccionDetector {
 			String actual = pila.peek();
 			int estadoActual = estados.getOrDefault(actual, 0);
 
-			switch (estadoActual) {
-			case 0 -> estados.put(actual, 1); // Visitando
-			case 1 -> {
-				estados.put(actual, 2); // Completamente visitado
+			if (estadoActual == 0) {
+				estados.put(actual, 1); // Visitando
+
+				for (String vecino : grafo.getOrDefault(actual, Collections.emptyList())) {
+					int estadoVecino = estados.getOrDefault(vecino, 0);
+
+					if (estadoVecino == 0) {
+						padres.put(vecino, actual);
+						pila.push(vecino);
+					} else if (estadoVecino == 1) { // Back-edge encontrado = Ciclo
+						return reconstruirCiclo(actual, vecino, padres);
+					}
+				}
+			} else {
+				if (estadoActual == 1) {
+					estados.put(actual, 2); // Completamente visitado
+				}
+				// Si ya fue visitado (estado 1 o 2), lo sacamos de la pila
 				pila.pop();
-				continue;
-			}
-				default -> {
-					pila.pop();
-					continue;
-				}
-			}
-
-			for (String vecino : grafo.getOrDefault(actual, Collections.emptyList())) {
-				int estadoVecino = estados.getOrDefault(vecino, 0);
-
-				if (estadoVecino == 0) {
-					padres.put(vecino, actual);
-					pila.push(vecino);
-				} else if (estadoVecino == 1) { // Back-edge encontrado = Ciclo
-					return reconstruirCiclo(actual, vecino, padres);
-				}
 			}
 		}
 		return new CicloReporte(false, Collections.emptyList());
