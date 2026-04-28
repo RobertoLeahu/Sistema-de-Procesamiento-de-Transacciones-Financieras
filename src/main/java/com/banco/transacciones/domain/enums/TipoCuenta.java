@@ -5,5 +5,5 @@ package com.banco.transacciones.domain.enums;
  */
 
 public enum TipoCuenta {
-	CORRIENTE, ACTIVO, EMPRESARIAl
+	CORRIENTE, ACTIVO, EMPRESARIAL
 }
