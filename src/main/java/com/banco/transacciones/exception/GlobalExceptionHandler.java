@@ -13,9 +13,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Controlador global de excepciones para todas las respuestas de error.
+ * Controlador global de excepciones para todas las respuestas de error. Maneja
+ * las excepciones lanzadas por la capa de servicio y las transforma en un JSON
+ * estandarizado para los clientes de la API.
  */
-
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -36,8 +37,9 @@ public class GlobalExceptionHandler {
 	}
 
 	@ExceptionHandler(CuentaBloqueadaException.class)
-	public ResponseEntity<ErrorResponse> handleCuentaBloqueada(CuentaBloqueadaException ex,
+	public ResponseEntity<ErrorResponse> handleCuentaBloqueadaException(CuentaBloqueadaException ex,
 			HttpServletRequest request) {
+		log.warn("Cuenta bloqueada: {} en el path: {}", ex.getMessage(), request.getRequestURI());
 		// Retorna 403 Forbidden
 		return buildResponse(HttpStatus.FORBIDDEN, "Cuenta bloqueada", ex.getMessage(), request);
 	}
@@ -45,6 +47,7 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(TransaccionNotFoundException.class)
 	public ResponseEntity<ErrorResponse> handleTransaccionNotFoundException(TransaccionNotFoundException ex,
 			HttpServletRequest request) {
+		log.warn("Transacción no encontrada: {} en el path: {}", ex.getMessage(), request.getRequestURI());
 		// Retorna 404 Not Found
 		return buildResponse(HttpStatus.NOT_FOUND, "Transacción no encontrada", ex.getMessage(), request);
 	}
@@ -80,6 +83,6 @@ public class GlobalExceptionHandler {
 		ErrorResponse response = new ErrorResponse(Instant.now(), status.value(), error, detalle,
 				request.getRequestURI());
 
-		return new ResponseEntity<ErrorResponse>(response, status);
+		return new ResponseEntity<>(response, status);
 	}
 }
