@@ -16,19 +16,19 @@ VALUES (3, 'Empresa Logística S.L.', 'B12345678', 'admin@logistica.com', CURREN
 -- 2. CUENTAS (Tabla: cuentas)
 -- Corrección vital: 'ACTIVA' -> 'ACTIVADA' y 'AHORRO' -> 'ACTIVO' según los Enums de Java.
 INSERT INTO cuentas (id, numero_cuenta, saldo, tipo, estado, cliente_id) 
-VALUES (1, 'ES9121000418401234567890', 12500.50, 'CORRIENTE', 'ACTIVADA', 1);
+VALUES (1, 'ES9121000418401234567890', 15000.0, 'CORRIENTE', 'ACTIVADA', 1);
 
 INSERT INTO cuentas (id, numero_cuenta, saldo, tipo, estado, cliente_id) 
-VALUES (2, 'ES9121000418401111111111', 500.00, 'ACTIVO', 'BLOQUEADA', 2);
+VALUES (2, 'ES9121000418401111111111', 10000.0, 'ACTIVO', 'BLOQUEADA', 2);
 
 INSERT INTO cuentas (id, numero_cuenta, saldo, tipo, estado, cliente_id) 
-VALUES (3, 'ES9121000418400987654321', 100.00, 'CORRIENTE', 'ACTIVADA', 2);
+VALUES (3, 'ES9121000418400987654321', 1000.0, 'CORRIENTE', 'ACTIVADA', 2);
 
 INSERT INTO cuentas (id, numero_cuenta, saldo, tipo, estado, cliente_id) 
-VALUES (4, 'ES9121000418402222222222', 1000.00, 'CORRIENTE', 'ACTIVADA', 3);
+VALUES (4, 'ES9121000418402222222222', 2000.0, 'CORRIENTE', 'ACTIVADA', 3);
 
 INSERT INTO cuentas (id, numero_cuenta, saldo, tipo, estado, cliente_id) 
-VALUES (5, 'ES9121000418403333333333', 49999.00, 'EMPRESARIAL', 'ACTIVADA', 3);
+VALUES (5, 'ES9121000418403333333333', 50000.0, 'EMPRESARIAL', 'ACTIVADA', 3);
 
 INSERT INTO cuentas (id, numero_cuenta, saldo, tipo, estado, cliente_id) 
 VALUES (6, 'ES9121000418404444444444', 5000.00, 'EMPRESARIAL', 'ACTIVADA', 3);

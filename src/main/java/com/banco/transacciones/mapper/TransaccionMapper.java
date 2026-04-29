@@ -16,6 +16,10 @@ public interface TransaccionMapper {
 	// Mapea de Entidad a DTO de salida
 	TransaccionDTO toResponse(Transaccion transaccion);
 
+	// Enlazamos explícitamente "fechaHora" de la entidad con "hora" del DTO
+	@Mapping(source = "fechaHora", target = "hora")
+	TransaccionDTO toDto(Transaccion transaccion);
+
 	// Mapea de DTO de entrada a Entidad (Ignorando campos autogenerados o
 	// calculados)
 	@Mapping(target = "id", ignore = true)

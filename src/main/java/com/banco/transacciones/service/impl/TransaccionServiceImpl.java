@@ -32,90 +32,86 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class TransaccionServiceImpl {
 
-	private final TransaccionRepository transaccionRepository;
 	private final TransaccionProcesador transaccionProcesador;
-	private final TransaccionMapper mapper;
+	private final TransaccionRepository transaccionRepository;
+	private final TransaccionMapper transaccionMapper;
 
 	/**
-	 * Inicia una transferencia individual entre cuentas de forma asíncrona.
-	 * Persiste la transacción en estado PROCESANDO y delega el procesamiento real a
-	 * un hilo separado para cumplir con el tiempo de respuesta 202 Accepted.
-	 *
-	 * @param dto Datos de la transferencia (origen, destino, monto).
-	 * @return DTO de la transacción creada con su estado inicial.
+	 * Inicia el proceso de transferencia. Guarda el estado PENDIENTE síncronamente
+	 * para obtener un ID real y delega el análisis pesado a un hilo secundario
+	 * asíncrono.
 	 */
-	@Transactional
 	public TransaccionDTO iniciarTransferencia(TransferenciaDTO dto) {
-		log.info("Iniciando transferencia - Origen: {}, Destino: {}, País: {}", dto.cuentaOrigen(), dto.cuentaDestino(),
-				dto.codigoPais());
+		log.info("Entrada: Orquestando inicio asíncrono para transferencia de {} a {}", dto.cuentaOrigen(),
+				dto.cuentaDestino());
 
-		Transaccion tx = Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
-				.monto(dto.monto()).codigoPais(dto.codigoPais()).tipo(TipoTransaccion.TRANSFERENCIA)
-				.estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now()).build();
+		// 1. Guardamos la transacción preliminar de forma síncrona para que Hibernate
+		// genere el ID.
+		Transaccion txInicial = Transaccion.builder().cuentaOrigen(dto.cuentaOrigen())
+				.cuentaDestino(dto.cuentaDestino()).monto(dto.monto()).codigoPais(dto.codigoPais())
+				.tipo(TipoTransaccion.TRANSFERENCIA).estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now())
+				.build();
 
-		tx = transaccionRepository.save(tx);
+		txInicial = transaccionRepository.save(txInicial);
+		log.info("Transacción preliminar guardada con éxito en BD. TX ID real asignado: {}", txInicial.getId());
 
-		transaccionProcesador.ejecutarTransferenciaAsync(dto, tx.getId());
+		// 2. Delegamos el procesamiento pesado (score, bloqueos) pasándole el ID real.
+		transaccionProcesador.procesarTransferenciaAsync(txInicial.getId(), dto);
 
-		TransaccionDTO response = mapper.toResponse(tx);
-
-		log.info("Salida: Solicitud de transferencia registrada exitosamente. ID: {}, Estado: {}", response.id(),
-				response.estado());
-
-		return response;
+		log.info("Salida: Tarea asíncrona delegada con éxito. Retornando acuse de recibo.");
+		return transaccionMapper.toDto(txInicial);
 	}
 
 	/**
-	 * Procesa un conjunto masivo de transacciones (hasta 500) en paralelo. Divide
-	 * el lote principal en sublotes de 50 para optimizar el uso del ThreadPool.
-	 *
-	 * @param lote Lista de transferencias a procesar.
-	 * @return Resumen estadístico de transacciones procesadas, exitosas y fallidas.
-	 * @throws IllegalArgumentException si el lote supera las 500 unidades.
+	 * Procesa un lote de transacciones dividiéndolo en fragmentos para ejecución
+	 * paralela.
 	 */
 	public ResumenLoteDTO procesarLote(List<TransferenciaDTO> lote) {
-		if (lote.size() > 500) {
-			throw new IllegalArgumentException("Máximo 500 transacciones por lote permitidas");
-		}
-
-		log.info("Iniciando procesamiento de lote de {} transacciones", lote.size());
+		log.info("Entrada: Iniciando procesamiento masivo de {} transacciones", lote.size());
 
 		int size = 50;
 		List<CompletableFuture<ResumenLoteDTO>> futuros = new ArrayList<>();
 
 		for (int i = 0; i < lote.size(); i += size) {
-			List<TransferenciaDTO> sublote = lote.subList(i, Math.min(i + size, lote.size()));
+			int endIndex = Math.min(i + size, lote.size());
+
+			// Partir el lote en sublotes de 50.
+			// Clonar el subList en un nuevo ArrayList para evitar
+			// problemas de concurrencia al leer la memoria compartida de la lista original.
+			List<TransferenciaDTO> sublote = new ArrayList<>(lote.subList(i, endIndex));
+
+			log.debug("Generando fragmentación: enviando sublote de tamaño {} (índices {} a {})", sublote.size(), i,
+					endIndex - 1);
 			futuros.add(transaccionProcesador.procesarSubloteAsync(sublote));
 		}
 
+		log.debug("Esperando la resolución de {} hilos de ejecución...", futuros.size());
+
+		// Esperar de forma segura a que todos los hilos terminen
+		CompletableFuture.allOf(futuros.toArray(new CompletableFuture[0])).join();
+
+		// Agregar los resultados y retornar un resumen
 		ResumenLoteDTO resumen = futuros.stream().map(CompletableFuture::join).reduce(new ResumenLoteDTO(0, 0, 0),
 				ResumenLoteDTO::sumar);
 
-		log.info("Lote procesado. Exitosas: {}, Fallidas: {}", resumen.totalExitosas(), resumen.totalFallidas());
+		log.info("Salida: Lote procesado totalmente. Exitosas: {}, Fallidas: {}", resumen.totalExitosas(),
+				resumen.totalFallidas());
 		return resumen;
 	}
 
-	/**
-	 * Consulta el estado actual de una transacción en proceso. Utiliza
-	 * {@code readOnly = true} para optimizar el rendimiento al evitar la gestión de
-	 * persistencia de cambios innecesaria en la base de datos.
-	 * 
-	 * @param id Identificador único de la transacción.
-	 * @return DTO con la información de estado y riesgo de la transacción.
-	 * @throws TransaccionNotFoundException si el ID no corresponde a ninguna
-	 *                                      transacción.
-	 */
 	@Transactional(readOnly = true)
 	public TransaccionDTO obtenerEstadoTransaccion(Long id) {
 		log.info("Entrada: Consultando estado para TX ID: {}", id);
 
 		Transaccion tx = transaccionRepository.findById(id).orElseThrow(() -> {
-			log.warn("Salida: Transacción {} no encontrada", id);
-			return new TransaccionNotFoundException("Transacción no encontrada con ID: " + id);
+			log.error("Consulta fallida: Transacción con ID {} no fue encontrada en sistema", id);
+			return new TransaccionNotFoundException("Transacción no encontrada con id: " + id);
 		});
 
-		log.info("Salida: Estado recuperado para TX ID: {} - Estado: {}", id, tx.getEstado());
+		log.debug("Mapeando entidad Transaccion a capa DTO inmutable para TX ID: {}", id);
+		TransaccionDTO dto = transaccionMapper.toDto(tx);
 
-		return mapper.toResponse(tx);
+		log.info("Salida: Estado de TX ID: {} validado como {}", id, dto.estado());
+		return dto;
 	}
 }
