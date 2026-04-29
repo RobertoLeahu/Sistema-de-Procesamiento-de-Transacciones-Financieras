@@ -110,15 +110,15 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(GeneralException.class)
 	public ResponseEntity<ErrorResponse> handleGeneralException(GeneralException ex, HttpServletRequest request) {
 		log.error("Excepción controlada de la aplicación", ex);
-		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", ex.getMessage(),
-				request.getRequestURI());
+		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
+				"Ocurrió un error inesperado en el servidor", request.getRequestURI());
 	}
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleUnknownException(Exception ex, HttpServletRequest request) {
 		log.error("Error no controlado detectado: ", ex);
 		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
-				"Ocurrió un error inesperado en el servidor.", request.getRequestURI());
+				"Ocurrió un error inesperado en el servidor", request.getRequestURI());
 	}
 
 	// ==========================================

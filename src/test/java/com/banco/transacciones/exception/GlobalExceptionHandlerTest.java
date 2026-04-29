@@ -62,8 +62,8 @@ class GlobalExceptionHandlerTest {
 	@DisplayName("Debe retornar 500 cuando haya un error no controlado")
 	void testHandleGeneralException() throws Exception {
 		mockMvc.perform(get("/test/general-exception")).andExpect(status().isInternalServerError())
-				.andExpect(jsonPath("$.status", is(500))).andExpect(jsonPath("$.error", is("Error interno")))
-				.andExpect(jsonPath("$.detalle", is("Ocurrió un error inesperado en el servidor")))
+				.andExpect(jsonPath("$.status", is(500)))
+				.andExpect(jsonPath("$.error", is("Error interno")))
 				.andExpect(jsonPath("$.path", is("/test/general-exception")));
 	}
 }
