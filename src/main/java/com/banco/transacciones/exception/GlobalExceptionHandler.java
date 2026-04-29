@@ -26,6 +26,9 @@ import lombok.extern.slf4j.Slf4j;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+	private static final String VALIDATION_ERROR = "Validation Error";
+	private static final String ERROR_INTERNO = "Error interno";
+	
 	// ==========================================
 	// EXCEPCIONES DE NEGOCIO Y DOMINIO
 	// ==========================================
@@ -84,14 +87,14 @@ public class GlobalExceptionHandler {
 		String errores = ex.getBindingResult().getFieldErrors().stream().map(FieldError::getDefaultMessage)
 				.collect(Collectors.joining(", "));
 		log.warn("Error de validación de objeto: {}", errores);
-		return buildResponse(HttpStatus.BAD_REQUEST, "Validation Error", errores, request.getRequestURI());
+		return buildResponse(HttpStatus.BAD_REQUEST, VALIDATION_ERROR, errores, request.getRequestURI());
 	}
 
 	@ExceptionHandler(ConstraintViolationException.class)
 	public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
 			HttpServletRequest request) {
 		log.warn("Error de restricción de parámetros: {}", ex.getMessage());
-		return buildResponse(HttpStatus.BAD_REQUEST, "Validation Error",
+		return buildResponse(HttpStatus.BAD_REQUEST, VALIDATION_ERROR,
 				"El lote enviado no cumple con las validaciones permitidas.", request.getRequestURI());
 	}
 
@@ -99,7 +102,7 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleHandlerMethodValidation(HandlerMethodValidationException ex,
 			HttpServletRequest request) {
 		log.warn("Error de validación de método (Spring 3.x): {}", ex.getMessage());
-		return buildResponse(HttpStatus.BAD_REQUEST, "Validation Error",
+		return buildResponse(HttpStatus.BAD_REQUEST, VALIDATION_ERROR,
 				"El lote no puede estar vacío y debe tener un máximo de 500 registros.", request.getRequestURI());
 	}
 
@@ -110,14 +113,14 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(GeneralException.class)
 	public ResponseEntity<ErrorResponse> handleGeneralException(GeneralException ex, HttpServletRequest request) {
 		log.error("Excepción controlada de la aplicación", ex);
-		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
+		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ERROR_INTERNO,
 				"Ocurrió un error inesperado en el servidor", request.getRequestURI());
 	}
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleUnknownException(Exception ex, HttpServletRequest request) {
 		log.error("Error no controlado detectado: ", ex);
-		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
+		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ERROR_INTERNO,
 				"Ocurrió un error inesperado en el servidor", request.getRequestURI());
 	}
 
