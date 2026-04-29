@@ -30,6 +30,9 @@ class GlobalExceptionHandlerTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	private static final String VALIDATION_ERROR = "Validation Error";
+	private static final String ERROR_INTERNO = "Error interno";
+
 	/**
 	 * Verifica el manejo de la excepción de fondos insuficientes. Se espera un
 	 * código HTTP 400 (Bad Request).
@@ -106,7 +109,7 @@ class GlobalExceptionHandlerTest {
 	@DisplayName("Debe retornar 500 para GeneralException")
 	void testHandleGeneralException() throws Exception {
 		mockMvc.perform(get("/test/general-exception")).andExpect(status().isInternalServerError())
-				.andExpect(jsonPath("$.status", is(500))).andExpect(jsonPath("$.error", is("Error interno")));
+				.andExpect(jsonPath("$.status", is(500))).andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
 	}
 
 	/**
@@ -117,7 +120,7 @@ class GlobalExceptionHandlerTest {
 	@DisplayName("Debe retornar 500 para Exception genérica no controlada")
 	void testHandleUnknownException() throws Exception {
 		mockMvc.perform(get("/test/exception")).andExpect(status().isInternalServerError())
-				.andExpect(jsonPath("$.status", is(500))).andExpect(jsonPath("$.error", is("Error interno")));
+				.andExpect(jsonPath("$.status", is(500))).andExpect(jsonPath("$.error", is(ERROR_INTERNO)));
 	}
 
 	/**
@@ -128,7 +131,7 @@ class GlobalExceptionHandlerTest {
 	@DisplayName("Debe retornar 400 para ConstraintViolationException")
 	void testHandleConstraintViolationException() throws Exception {
 		mockMvc.perform(get("/test/constraint-violation")).andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status", is(400))).andExpect(jsonPath("$.error", is("Validation Error")));
+				.andExpect(jsonPath("$.status", is(400))).andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
 	}
 
 	/**
@@ -141,7 +144,7 @@ class GlobalExceptionHandlerTest {
 		mockMvc.perform(
 				post("/test/method-argument").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.status", is(400)))
-				.andExpect(jsonPath("$.error", is("Validation Error")));
+				.andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
 	}
 
 	/**
@@ -153,6 +156,6 @@ class GlobalExceptionHandlerTest {
 	void testHandleHandlerMethodValidationException() throws Exception {
 		mockMvc.perform(get("/test/handler-method").param("param", "123")) // Fuerza el fallo del @Size(min=5)
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.status", is(400)))
-				.andExpect(jsonPath("$.error", is("Validation Error")));
+				.andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
 	}
 }
