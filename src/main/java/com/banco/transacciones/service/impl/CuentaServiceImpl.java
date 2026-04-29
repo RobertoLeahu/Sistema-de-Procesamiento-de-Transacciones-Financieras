@@ -39,15 +39,16 @@ public class CuentaServiceImpl {
 	 * {@code @Transactional(readOnly = true)} para optimizar las consultas y el
 	 * rendimiento en la base de datos.
 	 *
-	 * @param id El identificador único de la cuenta.
+	 * @param id El número de la cuenta.
 	 * @return Un objeto {@link CuentaResumenDTO} con las estadísticas calculadas.
-	 * @throws CuentaNotFoundException Si no existe una cuenta con el ID
+	 * @throws CuentaNotFoundException Si no existe una cuenta con el número
 	 *                                 proporcionado.
 	 */
 	@Transactional(readOnly = true)
 	public CuentaResumenDTO obtenerResumen(String numeroCuenta) {
+		log.info("Iniciando cálculo de resumen para la cuenta: {}", numeroCuenta);
 		Cuenta cuenta = cuentaRepository.findByNumeroCuenta(numeroCuenta)
-				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada, ID:" + numeroCuenta));
+				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada, número: " + numeroCuenta));
 
 		List<Transaccion> historial = transaccionRepository.findByCuentaOrigenOrCuentaDestino(numeroCuenta,
 				numeroCuenta);
@@ -80,6 +81,7 @@ public class CuentaServiceImpl {
 			desviacionEstandar = Math.sqrt(varianza);
 		}
 
+		log.info("Resumen generado exitosamente para la cuenta: {}", numeroCuenta);
 		return new CuentaResumenDTO(cuenta.getNumeroCuenta(), cuenta.getSaldo(), totalMovimientos, montoPromedio,
 				desviacionEstandar, puntuacionRiesgoAcumulada, alertasCriticas,
 				cuenta.getCliente() != null ? cuenta.getCliente().getFechaAlta() : null);

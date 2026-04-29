@@ -19,9 +19,8 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Long> {
 	/**
 	 * Busca una cuenta por su número aplicando un BLOQUEO PESIMISTA de escritura.
 	 * Esto bloquea la fila en la base de datos hasta que la transacción actual
-	 * finalice, evitando condiciones de carrera. * @EntityGraph se utiliza para
-	 * hacer un JOIN FETCH del cliente y evitar el error LazyInitializationException
-	 * en procesos asíncronos.
+	 * finalice, evitando condiciones de carrera. Se utiliza para operaciones de
+	 * transferencia que alteran el saldo.
 	 */
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@EntityGraph(attributePaths = { "cliente" })
@@ -30,7 +29,9 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Long> {
 
 	/**
 	 * Búsqueda estándar sin bloqueo de base de datos. También recupera el cliente
-	 * asociado para validaciones inmediatas.
+	 * asociado mediante EntityGraph para optimizar la consulta y evitar N+1 o
+	 * LazyInitializationException durante la agregación de datos. Este es el método
+	 * que debe usar el Endpoint de Resumen, ya que no altera saldos.
 	 */
 	@EntityGraph(attributePaths = { "cliente" })
 	Optional<Cuenta> findByNumeroCuenta(String numeroCuenta);

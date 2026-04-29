@@ -27,8 +27,8 @@ public class CuentaController {
 	/**
 	 * Retorna estadísticas detalladas de la cuenta.
 	 */
-	@GetMapping("/{id}/resumen")
-	public ResponseEntity<CuentaResumenDTO> obtenerResumenCuenta(@PathVariable("id") String numeroCuenta) {
+	@GetMapping("/{numeroCuenta}/resumen")
+	public ResponseEntity<CuentaResumenDTO> obtenerResumenCuenta(@PathVariable("numeroCuenta") String numeroCuenta) {
 		CuentaResumenDTO resumen = cuentaService.obtenerResumen(numeroCuenta);
 		return ResponseEntity.ok(resumen);
 	}
