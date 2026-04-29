@@ -38,7 +38,7 @@ public class TransaccionServiceImpl {
 
 	/**
 	 * Inicia una transferencia individual entre cuentas de forma asíncrona.
-	 * Persiste la transacción en estado PENDIENTE y delega el procesamiento real a
+	 * Persiste la transacción en estado PROCESANDO y delega el procesamiento real a
 	 * un hilo separado para cumplir con el tiempo de respuesta 202 Accepted.
 	 *
 	 * @param dto Datos de la transferencia (origen, destino, monto).
@@ -57,7 +57,12 @@ public class TransaccionServiceImpl {
 
 		transaccionProcesador.ejecutarTransferenciaAsync(dto, tx.getId());
 
-		return mapper.toResponse(tx);
+		TransaccionDTO response = mapper.toResponse(tx);
+
+		log.info("Salida: Solicitud de transferencia registrada exitosamente. ID: {}, Estado: {}", response.id(),
+				response.estado());
+
+		return response;
 	}
 
 	/**

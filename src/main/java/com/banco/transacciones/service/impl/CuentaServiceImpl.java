@@ -47,7 +47,7 @@ public class CuentaServiceImpl {
 	@Transactional(readOnly = true)
 	public CuentaResumenDTO obtenerResumen(String numeroCuenta) {
 		Cuenta cuenta = cuentaRepository.findByNumeroCuenta(numeroCuenta)
-				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada" + numeroCuenta));
+				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada, ID:" + numeroCuenta));
 
 		List<Transaccion> historial = transaccionRepository.findByCuentaOrigenOrCuentaDestino(numeroCuenta,
 				numeroCuenta);

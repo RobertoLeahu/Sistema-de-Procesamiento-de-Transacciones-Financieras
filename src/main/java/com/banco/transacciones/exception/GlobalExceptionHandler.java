@@ -65,7 +65,6 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleCuentaBloqueada(CuentaBloqueadaException ex,
 			HttpServletRequest request) {
 		log.warn("Cuenta bloqueada: {}", ex.getMessage());
-		// Ajustado a 403 FORBIDDEN para satisfacer los requisitos del test
 		return buildResponse(HttpStatus.FORBIDDEN, "Cuenta bloqueada", ex.getMessage(), request.getRequestURI());
 	}
 

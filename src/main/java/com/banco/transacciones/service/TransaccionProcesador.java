@@ -50,8 +50,6 @@ public class TransaccionProcesador {
 	 * @param transaccionId ID de la transacción persistida previamente.
 	 */
 	@Async("transaccionExecutor")
-	// SOLUCIÓN: Evitamos el Rollback explícitamente para excepciones de negocio
-	// controladas
 	@Transactional(noRollbackFor = { SaldoInsuficienteException.class })
 	public void ejecutarTransferenciaAsync(TransferenciaDTO dto, Long transaccionId) {
 		log.info("Iniciando procesamiento asíncrono para TX ID: {}", transaccionId);
@@ -132,11 +130,13 @@ public class TransaccionProcesador {
 			// 3. Validaciones y ejecución
 			if (riesgo > 0.75) {
 				tx.setEstado(EstadoTransaccion.RECHAZADA);
+				log.warn("ALERTA DE FRAUDE: TX {} rechazada por riesgo crítico ({}). Requiere revisión manual.", tx.getId(), riesgo);
 				generarAlerta(tx, NivelRiesgo.CRITICO, "Riesgo alto detectado: " + riesgo);
 			} else {
 				origen.setSaldo(origen.getSaldo().subtract(dto.monto()));
 				destino.setSaldo(destino.getSaldo().add(dto.monto()));
 				tx.setEstado(EstadoTransaccion.COMPLETADA);
+				log.info("Salida: Transacción {} completada exitosamente", tx.getId());
 			}
 		} finally {
 			transaccionRepository.save(tx);
