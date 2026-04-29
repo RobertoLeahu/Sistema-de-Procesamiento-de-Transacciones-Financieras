@@ -109,7 +109,7 @@ class GlobalExceptionHandlerTest {
 	@DisplayName("Debe retornar 500 para GeneralException")
 	void testHandleGeneralException() throws Exception {
 		mockMvc.perform(get("/test/general-exception")).andExpect(status().isInternalServerError())
-				.andExpect(jsonPath("$.status", is(500))).andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
+				.andExpect(jsonPath("$.status", is(500))).andExpect(jsonPath("$.error", is(ERROR_INTERNO)));
 	}
 
 	/**
