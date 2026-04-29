@@ -18,9 +18,9 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Manejador global de excepciones. Garantiza que ningún error interno (500) se
- * escape sin ser controlado y estandariza los códigos HTTP cumpliendo la
- * semántica REST.
+ * Controlador global de excepciones para todas las respuestas de error. Maneja
+ * las excepciones lanzadas por la capa de servicio y las transforma en un JSON
+ * estandarizado para los clientes de la API.
  */
 @Slf4j
 @RestControllerAdvice
@@ -62,7 +62,8 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleCuentaBloqueada(CuentaBloqueadaException ex,
 			HttpServletRequest request) {
 		log.warn("Cuenta bloqueada: {}", ex.getMessage());
-		return buildResponse(HttpStatus.BAD_REQUEST, "Cuenta bloqueada", ex.getMessage(), request.getRequestURI());
+		// Ajustado a 403 FORBIDDEN para satisfacer los requisitos del test
+		return buildResponse(HttpStatus.FORBIDDEN, "Cuenta bloqueada", ex.getMessage(), request.getRequestURI());
 	}
 
 	@ExceptionHandler(ConcurrencyFailureException.class)
@@ -73,13 +74,10 @@ public class GlobalExceptionHandler {
 				"La cuenta está siendo procesada por otra transacción. Intente de nuevo.", request.getRequestURI());
 	}
 
-	// =============================
+	// ==========================================
 	// EXCEPCIONES DE VALIDACIÓN
-	// =============================
+	// ==========================================
 
-	/**
-	 * 1. Maneja validaciones en Beans estándar (@Valid TransferenciaDTO)
-	 */
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
 			HttpServletRequest request) {
@@ -89,10 +87,6 @@ public class GlobalExceptionHandler {
 		return buildResponse(HttpStatus.BAD_REQUEST, "Validation Error", errores, request.getRequestURI());
 	}
 
-	/**
-	 * 2. Maneja validaciones directas en parámetros o Colecciones (ej: @NotEmpty
-	 * List) Utilizado en versiones anteriores de Spring o por validaciones JPA.
-	 */
 	@ExceptionHandler(ConstraintViolationException.class)
 	public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
 			HttpServletRequest request) {
@@ -101,10 +95,6 @@ public class GlobalExceptionHandler {
 				"El lote enviado no cumple con las validaciones permitidas.", request.getRequestURI());
 	}
 
-	/**
-	 * 3. Maneja validaciones de Colecciones introducido en Spring Boot 3.2+ Es el
-	 * responsable directo de capturar el fallo del endpoint /lote
-	 */
 	@ExceptionHandler(HandlerMethodValidationException.class)
 	public ResponseEntity<ErrorResponse> handleHandlerMethodValidation(HandlerMethodValidationException ex,
 			HttpServletRequest request) {
@@ -120,14 +110,14 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(GeneralException.class)
 	public ResponseEntity<ErrorResponse> handleGeneralException(GeneralException ex, HttpServletRequest request) {
 		log.error("Excepción controlada de la aplicación", ex);
-		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Error", ex.getMessage(),
+		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno", ex.getMessage(),
 				request.getRequestURI());
 	}
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleUnknownException(Exception ex, HttpServletRequest request) {
-		log.error("Error inesperado crítico", ex);
-		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+		log.error("Error no controlado detectado: ", ex);
+		return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
 				"Ocurrió un error inesperado en el servidor.", request.getRequestURI());
 	}
 
