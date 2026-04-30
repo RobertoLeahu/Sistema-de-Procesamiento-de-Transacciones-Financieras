@@ -41,6 +41,7 @@ public class TransaccionServiceImpl {
 		log.info("Entrada: Iniciando transferencia asíncrona de cuenta {} a cuenta {}", dto.cuentaOrigen(),
 				dto.cuentaDestino());
 
+		// 1. Persistimos el estado inicial
 		Transaccion tx = Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
 				.monto(dto.monto()).codigoPais(dto.codigoPais()).tipo(TipoTransaccion.TRANSFERENCIA)
 				.estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now()).build();
@@ -48,8 +49,10 @@ public class TransaccionServiceImpl {
 		tx = transaccionRepository.save(tx);
 		log.debug("Transacción inicial persistida con estado PENDIENTE. ID: {}", tx.getId());
 
+		// 2. Delegamos la ejecución pasándole el ID generado para que NO cree
+		// duplicados
 		log.debug("Delegando procesamiento concurrente al pool de hilos.");
-		transaccionProcesador.procesarTransferencia(dto); // Corregido a delegar la lógica
+		transaccionProcesador.procesarTransferenciaAsync(tx.getId(), dto);
 
 		TransaccionDTO response = transaccionMapper.toDto(tx);
 		log.info("Salida: Transferencia aceptada para procesamiento. ID: {}", response.id());

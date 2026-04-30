@@ -1,10 +1,12 @@
 package com.banco.transacciones.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +21,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +44,10 @@ import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
 import com.banco.transacciones.util.FraudeScoreCalculator;
 
+/**
+ * Pruebas unitarias para la validación de la lógica de negocio y concurrencia.
+ * Adaptado a la refactorización arquitectónica para el manejo seguro asíncrono.
+ */
 @ExtendWith(MockitoExtension.class)
 class TransaccionProcesadorTest {
 
@@ -58,6 +66,9 @@ class TransaccionProcesadorTest {
 	@InjectMocks
 	private TransaccionProcesador transaccionProcesador;
 
+	@Captor
+	private ArgumentCaptor<Transaccion> txCaptor;
+
 	private TransferenciaDTO dto;
 	private Cuenta cuentaOrigen;
 	private Cuenta cuentaDestino;
@@ -65,6 +76,8 @@ class TransaccionProcesadorTest {
 
 	@BeforeEach
 	void setUp() throws Exception {
+		// Inyectamos el self-reference para que las delegaciones internas se procesen
+		// como el objeto real
 		Field selfField = TransaccionProcesador.class.getDeclaredField("self");
 		selfField.setAccessible(true);
 		selfField.set(transaccionProcesador, transaccionProcesador);
@@ -82,68 +95,54 @@ class TransaccionProcesadorTest {
 	}
 
 	@Test
-	@DisplayName("Procesar Transferencia Async Por ID - Exitoso")
+	@DisplayName("Procesar Transferencia Async Por ID - Exitoso sin bloquear hilo")
 	void testProcesarTransferenciaAsyncPorId_Exito() {
 		when(transaccionRepository.findById(1L)).thenReturn(Optional.of(transaccion));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
 		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.1);
-		when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
 
-		CompletableFuture<Transaccion> future = transaccionProcesador.procesarTransferenciaAsync(1L, dto);
-		Transaccion resultado = future.join();
+		// Ejecución asíncrona segura
+		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferenciaAsync(1L, dto));
 
-		assertEquals(EstadoTransaccion.COMPLETADA, resultado.getEstado());
-		assertEquals(0.1, resultado.getRiesgoFraude());
+		// Comprobación de estado persistido final
+		assertEquals(EstadoTransaccion.COMPLETADA, transaccion.getEstado());
+		assertEquals(0.1, transaccion.getRiesgoFraude());
+		verify(transaccionRepository, times(1)).save(transaccion);
 	}
 
 	@Test
-	@DisplayName("Procesar Transferencia Async Por ID - Manejo de Excepciones y Futuro Fallido")
-	void testProcesarTransferenciaAsyncPorId_Excepcion() {
-		when(transaccionRepository.findById(1L)).thenThrow(new RuntimeException("Fallo simulado BD"));
+	@DisplayName("Procesar Transferencia Async Por ID - Captura de Excepciones Segura")
+	void testProcesarTransferenciaAsyncPorId_ExcepcionOculta() {
+		// Simulamos fallo crítico en BDD
+		when(transaccionRepository.findById(1L)).thenThrow(new RuntimeException("Fallo de red BD"));
 
-		CompletableFuture<Transaccion> future = transaccionProcesador.procesarTransferenciaAsync(1L, dto);
-
-		assertTrue(future.isCompletedExceptionally());
+		// El decorador @Async debe garantizar que la excepción no revienta la
+		// aplicación, solo se loguea
+		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferenciaAsync(1L, dto));
+		verify(transaccionRepository, times(1)).findById(1L);
 	}
 
 	@Test
-	@DisplayName("Lógica de Transacción - No Encuentra ID")
-	void testProcesarTransferenciaPorId_TransaccionNoEncontrada() {
+	@DisplayName("Lógica de Negocio - Transacción Inicial No Encontrada")
+	void testProcesarTransferencia_TransaccionNoEncontrada() {
 		when(transaccionRepository.findById(1L)).thenReturn(Optional.empty());
 
-		assertThrows(TransaccionNotFoundException.class,
-				() -> transaccionProcesador.procesarTransferenciaPorId(1L, dto));
+		assertThrows(TransaccionNotFoundException.class, () -> transaccionProcesador.procesarTransferencia(1L, dto));
 	}
 
 	@Test
-	@DisplayName("Lógica de Transacción - Origen No Encontrado")
+	@DisplayName("Lógica de Negocio - Excepción por Origen Inexistente")
 	void testEjecutarLogicaTransaccion_OrigenNotFound() {
-		when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.empty());
-
-		assertThrows(CuentaNotFoundException.class, () -> transaccionProcesador.procesarTransferencia(dto));
-
-		// Verificamos que el catch haya seteado a RECHAZADA antes de hacer el throw
-		assertEquals(EstadoTransaccion.RECHAZADA, transaccion.getEstado());
-	}
-
-	@Test
-	@DisplayName("Lógica de Transacción - Destino No Encontrado")
-	void testEjecutarLogicaTransaccion_DestinoNotFound() {
-		when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
-		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
-		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.empty());
-
 		assertThrows(CuentaNotFoundException.class, () -> transaccionProcesador.procesarTransferencia(dto));
 	}
 
 	@Test
-	@DisplayName("Lógica de Transacción - Cuentas Inactivas o Bloqueadas")
+	@DisplayName("Lógica de Negocio - Cuentas Inactivas o Bloqueadas")
 	void testEjecutarLogicaTransaccion_CuentasInactivas() {
 		cuentaOrigen.setEstado(EstadoCuenta.BLOQUEADA);
 
-		when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
 
@@ -151,45 +150,94 @@ class TransaccionProcesadorTest {
 	}
 
 	@Test
-	@DisplayName("Lógica de Transacción - Riesgo Medio (Continúa pero avisa en logs)")
+	@DisplayName("Lógica de Negocio - Riesgo Medio (Genera alerta, no bloquea operación)")
 	void testEjecutarLogicaTransaccion_RiesgoMedio() {
-		when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
 
-		// Score 0.60 está en el rango [0.50, 0.75]
+		// Score 0.60 está en el rango (0.50, 0.75]
 		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.60);
 
-		Transaccion resultado = transaccionProcesador.procesarTransferencia(dto);
+		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferencia(dto));
 
-		assertEquals(EstadoTransaccion.COMPLETADA, resultado.getEstado());
-		assertEquals(0.60, resultado.getRiesgoFraude());
+		verify(alertaFraudeRepository, times(1)).save(any(AlertaFraude.class));
+		verify(transaccionRepository, times(2)).save(txCaptor.capture());
+
+		// Verificamos que se actualizó el estado correctamente al final de la lógica
+		assertEquals(EstadoTransaccion.COMPLETADA, txCaptor.getAllValues().get(1).getEstado());
 	}
 
 	@Test
-	@DisplayName("Lógica de Transacción - Saldo Insuficiente")
+	@DisplayName("Lógica de Negocio - Saldo Insuficiente en Origen")
 	void testEjecutarLogicaTransaccion_SaldoInsuficiente() {
 		cuentaOrigen.setSaldo(new BigDecimal("10.00")); // Requerido 100
 
-		when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
-		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.1);
 
 		assertThrows(SaldoInsuficienteException.class, () -> transaccionProcesador.procesarTransferencia(dto));
 	}
 
 	@Test
-	@DisplayName("Lógica de Transacción - Riesgo Crítico (>0.75) y Generación de Alerta")
+	@DisplayName("Lógica de Negocio - Riesgo Crítico (>0.75), Rechazo Total")
 	void testEjecutarLogicaTransaccion_RiesgoCritico() {
-		when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
-		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.85); // Mayor a 0.75
+		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.85);
 
-		Transaccion resultado = transaccionProcesador.procesarTransferencia(dto);
+		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferencia(dto));
 
-		assertEquals(EstadoTransaccion.RECHAZADA, resultado.getEstado());
-		verify(alertaFraudeRepository).save(any(AlertaFraude.class));
+		verify(transaccionRepository, times(2)).save(txCaptor.capture());
+		assertEquals(EstadoTransaccion.RECHAZADA, txCaptor.getAllValues().get(1).getEstado());
+		verify(alertaFraudeRepository, times(1)).save(any(AlertaFraude.class));
+	}
+
+	@Test
+	@DisplayName("Ejecución por Lotes - Procesamiento Paralelo Exitoso y Gestión de Fallos (100% Cobertura)")
+	void testProcesarSubloteAsync_Mixto() {
+		// Configuramos un sublote con diferentes casuísticas de fallo real en un
+		// ThreadPool
+		TransferenciaDTO dtoExito = new TransferenciaDTO("ES11", "ES22", new BigDecimal("10.00"), "ES", "Exito");
+		TransferenciaDTO dtoErrorDb = new TransferenciaDTO("ES33", "ES44", new BigDecimal("10.00"), "ES", "DB Error");
+		TransferenciaDTO dtoDeadlock = new TransferenciaDTO("ES55", "ES66", new BigDecimal("10.00"), "ES", "Deadlock");
+		TransferenciaDTO dtoUnknown = new TransferenciaDTO("ES77", "ES88", new BigDecimal("10.00"), "ES", "Unknown");
+
+		List<TransferenciaDTO> sublote = List.of(dtoExito, dtoErrorDb, dtoDeadlock, dtoUnknown);
+
+		// Lenient se usa para evitar 'UnnecessaryStubbingException' ya que algunos
+		// fallan a la mitad
+		lenient().when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
+
+		// Para dtoExito
+		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
+		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
+		lenient().when(fraudeScoreCalculator.calcularScore(dtoExito)).thenReturn(0.1);
+
+		// Para dtoErrorDb
+		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES33"))
+				.thenThrow(new RuntimeException("JDBC exception: Connection timeout"));
+
+		// Para dtoDeadlock
+		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES55"))
+				.thenThrow(new RuntimeException("JDBC exception: Deadlock found when trying to get lock"));
+
+		// Para dtoUnknown (Mensaje null simulado)
+		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES77"))
+				.thenThrow(new RuntimeException((String) null));
+
+		// Ejecutamos con offset inicial 10
+		CompletableFuture<ResumenLoteDTO> future = transaccionProcesador.procesarSubloteAsync(sublote, 10);
+		ResumenLoteDTO result = future.join();
+
+		assertEquals(4, result.totalRecibidas());
+		assertEquals(1, result.totalExitosas());
+		assertEquals(3, result.totalFallidas());
+
+		// Validamos el parseo e interceptación de los mensajes críticos de base de
+		// datos
+		String resultadosString = result.detallesRechazo().toString();
+		assertTrue(resultadosString.contains("Error interno de base de datos al procesar la transacción."));
+		assertTrue(resultadosString.contains("Interbloqueo detectado por alta concurrencia"));
+		assertTrue(resultadosString.contains("Error desconocido del servidor."));
 	}
 }

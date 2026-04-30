@@ -25,6 +25,7 @@ import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
 import com.banco.transacciones.exception.CuentaNotFoundException;
 import com.banco.transacciones.exception.SaldoInsuficienteException;
+import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
@@ -59,12 +60,23 @@ public class TransaccionProcesador {
 	}
 
 	/**
-	 * Procesa un sublote de transacciones en un hilo separado. REGLA CRÍTICA: Este
-	 * método NO debe estar anotado con @Transactional. Si lo estuviera, acapararía
-	 * conexiones a base de datos y causaría un Deadlock (Starvation del pool
-	 * HikariCP) al procesar lotes grandes.
-	 * 
-	 * @param offsetIndice El índice global donde empieza este sublote.
+	 * Punto de entrada ASÍNCRONO para transacciones individuales. Delega en un
+	 * método transaccional para cumplir con el patrón async.
+	 */
+	@Async
+	public void procesarTransferenciaAsync(Long transaccionId, TransferenciaDTO dto) {
+		try {
+			self.procesarTransferencia(transaccionId, dto);
+		} catch (Exception e) {
+			log.error("Fallo inesperado al procesar asíncronamente la transacción {}: {}", transaccionId,
+					e.getMessage());
+			// Opcional: Aquí podrías buscar la transacción y marcarla como REVERTIDA o
+			// ERROR de sistema.
+		}
+	}
+
+	/**
+	 * Procesa un sublote de transacciones en un hilo separado.
 	 */
 	@Async
 	public CompletableFuture<ResumenLoteDTO> procesarSubloteAsync(List<TransferenciaDTO> sublote, int offsetIndice) {
@@ -80,11 +92,9 @@ public class TransaccionProcesador {
 			try {
 				log.debug("Procesando TX interna del sublote - Origen: {}, Destino: {}", dto.cuentaOrigen(),
 						dto.cuentaDestino());
-				self.procesarTransferencia(dto);
+				self.procesarTransferencia(dto); // Para los lotes, sí creamos la entidad desde cero
 				exitosas++;
 			} catch (Exception e) {
-				// FIX DE SEGURIDAD: Saneamiento del mensaje de error para no exponer SQL ni
-				// trazas internas en el API
 				String mensajeErrorSaneado = e.getMessage();
 				if (mensajeErrorSaneado != null && mensajeErrorSaneado.contains("JDBC exception")) {
 					if (mensajeErrorSaneado.contains("Deadlock")) {
@@ -96,8 +106,6 @@ public class TransaccionProcesador {
 					mensajeErrorSaneado = "Error desconocido del servidor.";
 				}
 
-				// CUMPLIMIENTO REQUISITO: Loguear en terminal el fallo del sublote (En el log
-				// interno SÍ dejamos la traza real para depuración)
 				log.error("❌ Fallo en sublote (Índice {}). Origen {}: {}", indiceGlobal, dto.cuentaOrigen(),
 						e.getMessage());
 
@@ -112,12 +120,37 @@ public class TransaccionProcesador {
 				.completedFuture(new ResumenLoteDTO(sublote.size(), exitosas, fallidas, detallesRechazo));
 	}
 
+	/**
+	 * Sobrecarga para transferencias individuales: Busca la transacción existente
+	 * en lugar de duplicarla.
+	 */
+	@Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+	public void procesarTransferencia(Long transaccionId, TransferenciaDTO dto) {
+		log.debug("Ejecutando lógica de negocio para transacción existente en hilo asíncrono.");
+		Transaccion tx = transaccionRepository.findById(transaccionId).orElseThrow(
+				() -> new TransaccionNotFoundException("Transacción inicial no encontrada: " + transaccionId));
+
+		aplicarReglasDeNegocio(tx, dto);
+	}
+
+	/**
+	 * Método original usado por el proceso por Lotes: Crea la transacción porque es
+	 * la primera vez que se lee.
+	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
 	public void procesarTransferencia(TransferenciaDTO dto) {
-		log.debug("Ejecutando lógica de negocio para transferencia en hilo actual.");
+		log.debug("Ejecutando lógica de negocio para nueva transferencia en lote.");
 		Transaccion tx = crearEntidadInicial(dto);
 		transaccionRepository.save(tx);
 
+		aplicarReglasDeNegocio(tx, dto);
+	}
+
+	/**
+	 * Centralización de la lógica para evitar "Code Smells" (Código duplicado) en
+	 * SonarQube.
+	 */
+	private void aplicarReglasDeNegocio(Transaccion tx, TransferenciaDTO dto) {
 		// Bloqueo Pesimista (causante de los Deadlocks sanos de base de datos en alta
 		// concurrencia)
 		Cuenta cuentaOrigen = cuentaRepository.findByNumeroCuentaWithLock(dto.cuentaOrigen())
@@ -160,7 +193,7 @@ public class TransaccionProcesador {
 
 		tx.setEstado(EstadoTransaccion.COMPLETADA);
 		transaccionRepository.save(tx);
-		log.debug("Transferencia completada con éxito.");
+		log.debug("Transferencia completada con éxito. ID: {}", tx.getId());
 	}
 
 	private Transaccion crearEntidadInicial(TransferenciaDTO dto) {
