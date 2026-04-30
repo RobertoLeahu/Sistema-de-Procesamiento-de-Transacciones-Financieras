@@ -1,6 +1,7 @@
 package com.banco.transacciones.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -26,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.banco.transacciones.domain.models.Cliente;
 import com.banco.transacciones.domain.models.Cuenta;
 import com.banco.transacciones.dto.request.TransferenciaDTO;
+import com.banco.transacciones.dto.response.ResultadoFraude;
 import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
 
@@ -74,160 +76,129 @@ class FraudeScoreCalculatorTest {
 		Mockito.lenient().when(clock.getZone()).thenReturn(ZoneId.systemDefault());
 	}
 
-	/**
-	 * Verifica el flujo nominal de una operacion legitima. Asegura que si ningun
-	 * umbral o heuristica de riesgo se dispara, el motor estadistico mantenga el
-	 * acumulador estrictamente en 0.0.
-	 */
 	@Test
-	@DisplayName("Debe retornar score 0.0 cuando ninguna regla de fraude se cumple")
+	@DisplayName("Debe retornar score 0.0 y sin motivos cuando ninguna regla se cumple")
 	void calcularScore_SinRiesgo_RetornaCero() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("5000.00"), PAIS_HABITUAL);
 
 		configurarMocksBase(2, 10, PAIS_HABITUAL);
 
-		double score = calculator.calcularScore(request);
+		ResultadoFraude resultado = calculator.calcularScore(request);
 
-		assertEquals(0.0, score, 0.001);
+		assertEquals(0.0, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().isEmpty(), "No debe registrar ningún motivo de fraude");
 	}
 
-	/**
-	 * Comprueba el peor escenario estadistico posible. Garantiza que la
-	 * coincidencia simultanea de todos los indicadores de riesgo sume exactamente
-	 * 1.0 (100%), marcando el limite superior matematico del calculador.
-	 */
 	@Test
-	@DisplayName("Debe retornar score 1.0 cuando TODAS las reglas se cumplen")
+	@DisplayName("Debe retornar score 1.0 y todos los motivos cuando TODAS las reglas se cumplen")
 	void calcularScore_RiesgoMaximo_RetornaUno() {
-		// Cambiamos a horario nocturno
 		when(clock.instant()).thenReturn(INSTANT_NOCTURNO);
-		// Monto > 10,000 y país distinto al habitual ("FR")
 		TransferenciaDTO request = crearRequest(new BigDecimal("15000.00"), "FR");
 
-		// 5 tx recientes (> 3), 2 días de antigüedad (< 7)
 		configurarMocksBase(5, 2, PAIS_HABITUAL);
 
-		double score = calculator.calcularScore(request);
+		ResultadoFraude resultado = calculator.calcularScore(request);
 
-		assertEquals(1.0, score, 0.001);
+		assertEquals(1.0, resultado.score(), 0.001);
+		assertEquals(5, resultado.motivos().size(), "Deben registrarse exactamente 5 motivos");
+		assertTrue(resultado.motivos().contains("Monto elevado (>10.000)"));
+		assertTrue(resultado.motivos().contains("Horario inusual (00:00-05:00)"));
+		assertTrue(resultado.motivos().contains("Alta frecuencia (>3 transacciones en 5 min)"));
+		assertTrue(resultado.motivos().contains("Cuenta destino reciente (<7 días)"));
+		assertTrue(resultado.motivos().stream().anyMatch(m -> m.contains("País destino inusual")));
 	}
 
-	/**
-	 * Aísla y valida la regla de impacto financiero. Asegura que el sobrepasar el
-	 * limite monetario configurado incremente la ponderacion exacta estipulada para
-	 * este factor individual.
-	 */
 	@Test
-	@DisplayName("Debe sumar 0.30 cuando solo el monto supera el umbral")
+	@DisplayName("Debe sumar 0.30 y registrar el motivo cuando solo el monto supera el umbral")
 	void calcularScore_SoloMontoAlto_SumaTreinta() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("10000.01"), PAIS_HABITUAL);
 		configurarMocksBase(1, 10, PAIS_HABITUAL);
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.30, score, 0.001);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.30, resultado.score(), 0.001);
+		assertEquals(1, resultado.motivos().size());
+		assertEquals("Monto elevado (>10.000)", resultado.motivos().get(0));
 	}
 
-	/**
-	 * Comprueba la heuristica cronologica. Mediante la inyeccion de un reloj fijo,
-	 * asegura que las transacciones ejecutadas en horario no comercial o madrugada
-	 * reciban la penalizacion por comportamiento inusual.
-	 */
 	@Test
-	@DisplayName("Debe sumar 0.20 cuando la transacción es en horario nocturno")
+	@DisplayName("Debe sumar 0.20 y registrar el motivo cuando la transacción es en horario nocturno")
 	void calcularScore_SoloHoraNocturna_SumaVeinte() {
 		when(clock.instant()).thenReturn(INSTANT_NOCTURNO);
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
 		configurarMocksBase(1, 10, PAIS_HABITUAL);
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.20, score, 0.001);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.20, resultado.score(), 0.001);
+		assertEquals("Horario inusual (00:00-05:00)", resultado.motivos().get(0));
 	}
 
-	/**
-	 * Valida la regla de deteccion de rafagas o ataques automatizados. Verifica que
-	 * la acumulacion acelerada de peticiones desde un mismo origen infle el score
-	 * de riesgo preventivamente.
-	 */
 	@Test
-	@DisplayName("Debe sumar 0.25 cuando hay alta frecuencia de transacciones")
+	@DisplayName("Debe sumar 0.25 y registrar el motivo cuando hay alta frecuencia de transacciones")
 	void calcularScore_SoloFrecuencia_SumaVeinticinco() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
-		configurarMocksBase(4, 10, PAIS_HABITUAL); // 4 transacciones (supera las 3 permitidas)
+		configurarMocksBase(4, 10, PAIS_HABITUAL);
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.25, score, 0.001);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.25, resultado.score(), 0.001);
+		assertEquals("Alta frecuencia (>3 transacciones en 5 min)", resultado.motivos().get(0));
 	}
 
-	/**
-	 * Aísla la verificacion anti-mulas. Penaliza el envio de fondos hacia cuentas
-	 * de nueva creacion que no cuentan con un historial comprobado en el banco.
-	 */
 	@Test
-	@DisplayName("Debe sumar 0.15 cuando la cuenta destino es reciente (< 7 días)")
+	@DisplayName("Debe sumar 0.15 y registrar el motivo cuando la cuenta destino es reciente (< 7 días)")
 	void calcularScore_SoloCuentaNueva_SumaQuince() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
-		configurarMocksBase(1, 5, PAIS_HABITUAL); // Cuenta creada hace 5 días
+		configurarMocksBase(1, 5, PAIS_HABITUAL);
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.15, score, 0.001);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.15, resultado.score(), 0.001);
+		assertEquals("Cuenta destino reciente (<7 días)", resultado.motivos().get(0));
 	}
 
-	/**
-	 * Verifica la geolocalizacion del riesgo basado en inteligencia historica.
-	 * Aumenta el score si el pais de destino difiere del comportamiento habitual
-	 * que el modelo ha registrado previamente para esa cuenta.
-	 */
 	@Test
-	@DisplayName("Debe sumar 0.10 cuando el país es inusual basado en el historial")
+	@DisplayName("Debe sumar 0.10 y registrar el motivo cuando el país es inusual basado en el historial")
 	void calcularScore_SoloPaisInusual_SumaDiez() {
-		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), "US"); // País de envío US
-		configurarMocksBase(1, 10, PAIS_HABITUAL); // Historial dice ES
+		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), "US");
+		configurarMocksBase(1, 10, PAIS_HABITUAL);
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.10, score, 0.001);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.10, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().get(0).contains("País destino inusual (US)"));
 	}
 
-	/**
-	 * Comprueba la resiliencia del modelo predictivo frente a la falta de
-	 * historial. Asegura que, si no hay registros previos, el motor se apoye en los
-	 * datos base de residencia del cliente para ejecutar la evaluacion geografica.
-	 */
 	@Test
 	@DisplayName("Evalúa país inusual usando el fallback de la cuenta cuando no hay historial")
 	void calcularScore_PaisInusual_FallbackCuenta_SumaDiez() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), "US");
 
-		// Frecuencia baja
 		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(eq(CUENTA_ORIGEN), any(Instant.class)))
 				.thenReturn(1L);
 
-		// Sin historial de país en transacciones
 		when(transaccionRepository.findPaisHabitual(CUENTA_ORIGEN)).thenReturn(Optional.empty());
 
-		// Cuenta destino (para la validación de antigüedad, ponemos > 7 días)
 		Cliente clienteDestino = mock(Cliente.class);
 		LocalDate fechaAlta = LocalDate.ofInstant(INSTANT_DIURNO, ZoneId.systemDefault()).minusDays(10);
 		when(clienteDestino.getFechaAlta()).thenReturn(fechaAlta);
 		Cuenta cuentaDestino = Cuenta.builder().cliente(clienteDestino).build();
 		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.of(cuentaDestino));
 
-		// Cuenta origen para extraer el país por defecto (ES)
 		Cliente clienteOrigen = mock(Cliente.class);
 		when(clienteOrigen.getPaisResidencia()).thenReturn(PAIS_HABITUAL);
 		Cuenta cuentaOrigen = Cuenta.builder().cliente(clienteOrigen).build();
 		when(cuentaRepository.findByNumeroCuenta(CUENTA_ORIGEN)).thenReturn(Optional.of(cuentaOrigen));
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.10, score, 0.001);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.10, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().get(0).contains("País destino inusual (US)"));
 	}
 
-	/**
-	 * Garantiza la estabilidad del sistema frente a inconsistencias
-	 * transaccionales. Valida que una peticion hacia una cuenta inexistente no
-	 * detenga el motor de calculo y simplemente obvie la metrica de antiguedad.
-	 */
 	@Test
-	@DisplayName("No debe sumar puntos si la cuenta destino no existe")
+	@DisplayName("No debe sumar puntos ni motivos si la cuenta destino no existe")
 	void calcularScore_CuentaDestinoInexistente_NoSumaAntiguedad() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
 		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.empty());
@@ -235,30 +206,27 @@ class FraudeScoreCalculatorTest {
 		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(any(), any())).thenReturn(0L);
 		when(transaccionRepository.findPaisHabitual(any())).thenReturn(Optional.of(PAIS_HABITUAL));
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.0, score);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.0, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().isEmpty());
 	}
 
-	/**
-	 * Valida el manejo seguro de corrupcion de datos en capa de dominio. Si un
-	 * registro carece de fechas o datos obligatorios en su cliente vinculado, el
-	 * calculador ignora silenciosamente ese peso en lugar de fallar.
-	 */
 	@Test
-	@DisplayName("Debe manejar correctamente cliente o fecha de alta nulos")
+	@DisplayName("Debe manejar correctamente cliente o fecha de alta nulos sin sumar motivos extra")
 	void calcularScore_DatosClienteIncompletos_NoSumaAntiguedad() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
 
-		// Caso: Cliente nulo
 		Cuenta cuentaSinCliente = Cuenta.builder().cliente(null).build();
 		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.of(cuentaSinCliente));
 
-		// Evitamos que sume por otros motivos
 		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(any(), any())).thenReturn(0L);
 		when(transaccionRepository.findPaisHabitual(any())).thenReturn(Optional.of(PAIS_HABITUAL));
 
-		double score = calculator.calcularScore(request);
-		assertEquals(0.0, score, 0.001);
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.0, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().isEmpty());
 	}
 
 	// --- MÉTODOS AUXILIARES ---
@@ -267,14 +235,11 @@ class FraudeScoreCalculatorTest {
 	}
 
 	private void configurarMocksBase(long txRecientes, int diasAntiguedad, String paisHabitual) {
-		// Frecuencia
 		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(eq(CUENTA_ORIGEN), any(Instant.class)))
 				.thenReturn(txRecientes);
 
-		// País Habitual
 		when(transaccionRepository.findPaisHabitual(CUENTA_ORIGEN)).thenReturn(Optional.of(paisHabitual));
 
-		// Antigüedad Cuenta Destino
 		Cliente clienteMock = mock(Cliente.class);
 		LocalDate fechaAlta = LocalDate.ofInstant(INSTANT_DIURNO, ZoneId.systemDefault()).minusDays(diasAntiguedad);
 		when(clienteMock.getFechaAlta()).thenReturn(fechaAlta);

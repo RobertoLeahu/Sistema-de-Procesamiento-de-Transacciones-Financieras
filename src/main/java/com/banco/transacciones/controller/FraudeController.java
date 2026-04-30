@@ -2,6 +2,7 @@ package com.banco.transacciones.controller;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,12 +29,14 @@ public class FraudeController {
 	private final FraudeServiceImpl fraudeService;
 
 	/**
-	 * Retorna todas las alertas no revisadas con paginación. Spring mapeará
-	 * automáticamente los query params (ej. ?page=0&size=20&sort=fecha,desc).
+	 * Retorna todas las alertas no revisadas con paginación. Se configura el Sort
+	 * predeterminado según reglas de negocio: Riesgo DESC y Fecha (mediante el ID)
+	 * DESC.
 	 */
 	@GetMapping("/alertas")
 	public ResponseEntity<Page<AlertaFraudeDTO>> listarAlertasPendientes(
-			@PageableDefault(size = 20) Pageable pageable) {
+			@PageableDefault(size = 20, sort = { "nivel", "id" }, direction = Direction.DESC) Pageable pageable) {
+
 		Page<AlertaFraudeDTO> alertas = fraudeService.obtenerAlertasNoRevisadas(pageable);
 		return ResponseEntity.ok(alertas);
 	}
