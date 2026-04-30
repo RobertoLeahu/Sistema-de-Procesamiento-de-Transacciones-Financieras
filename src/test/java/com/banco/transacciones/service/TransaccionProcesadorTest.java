@@ -34,6 +34,7 @@ import com.banco.transacciones.domain.models.AlertaFraude;
 import com.banco.transacciones.domain.models.Cuenta;
 import com.banco.transacciones.domain.models.Transaccion;
 import com.banco.transacciones.dto.request.TransferenciaDTO;
+import com.banco.transacciones.dto.response.ResultadoFraude;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
 import com.banco.transacciones.exception.CuentaNotFoundException;
@@ -76,8 +77,6 @@ class TransaccionProcesadorTest {
 
 	@BeforeEach
 	void setUp() throws Exception {
-		// Inyectamos el self-reference para que las delegaciones internas se procesen
-		// como el objeto real
 		Field selfField = TransaccionProcesador.class.getDeclaredField("self");
 		selfField.setAccessible(true);
 		selfField.set(transaccionProcesador, transaccionProcesador);
@@ -100,12 +99,12 @@ class TransaccionProcesadorTest {
 		when(transaccionRepository.findById(1L)).thenReturn(Optional.of(transaccion));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
-		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.1);
 
-		// Ejecución asíncrona segura
+		// CORRECCIÓN: Se actualiza el mock para retornar el nuevo Record esperado
+		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(new ResultadoFraude(0.1, List.of()));
+
 		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferenciaAsync(1L, dto));
 
-		// Comprobación de estado persistido final
 		assertEquals(EstadoTransaccion.COMPLETADA, transaccion.getEstado());
 		assertEquals(0.1, transaccion.getRiesgoFraude());
 		verify(transaccionRepository, times(1)).save(transaccion);
@@ -114,11 +113,8 @@ class TransaccionProcesadorTest {
 	@Test
 	@DisplayName("Procesar Transferencia Async Por ID - Captura de Excepciones Segura")
 	void testProcesarTransferenciaAsyncPorId_ExcepcionOculta() {
-		// Simulamos fallo crítico en BDD
 		when(transaccionRepository.findById(1L)).thenThrow(new RuntimeException("Fallo de red BD"));
 
-		// El decorador @Async debe garantizar que la excepción no revienta la
-		// aplicación, solo se loguea
 		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferenciaAsync(1L, dto));
 		verify(transaccionRepository, times(1)).findById(1L);
 	}
@@ -155,15 +151,15 @@ class TransaccionProcesadorTest {
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
 
-		// Score 0.60 está en el rango (0.50, 0.75]
-		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.60);
+		// CORRECCIÓN: Simulamos la infracción de una regla para el riesgo medio
+		when(fraudeScoreCalculator.calcularScore(dto))
+				.thenReturn(new ResultadoFraude(0.60, List.of("Horario inusual")));
 
 		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferencia(dto));
 
 		verify(alertaFraudeRepository, times(1)).save(any(AlertaFraude.class));
 		verify(transaccionRepository, times(2)).save(txCaptor.capture());
 
-		// Verificamos que se actualizó el estado correctamente al final de la lógica
 		assertEquals(EstadoTransaccion.COMPLETADA, txCaptor.getAllValues().get(1).getEstado());
 	}
 
@@ -183,7 +179,10 @@ class TransaccionProcesadorTest {
 	void testEjecutarLogicaTransaccion_RiesgoCritico() {
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
-		when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(0.85);
+
+		// CORRECCIÓN: Simulamos la infracción de dos reglas críticas
+		when(fraudeScoreCalculator.calcularScore(dto))
+				.thenReturn(new ResultadoFraude(0.85, List.of("Monto elevado", "País inusual")));
 
 		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferencia(dto));
 
@@ -195,8 +194,6 @@ class TransaccionProcesadorTest {
 	@Test
 	@DisplayName("Ejecución por Lotes - Procesamiento Paralelo Exitoso y Gestión de Fallos (100% Cobertura)")
 	void testProcesarSubloteAsync_Mixto() {
-		// Configuramos un sublote con diferentes casuísticas de fallo real en un
-		// ThreadPool
 		TransferenciaDTO dtoExito = new TransferenciaDTO("ES11", "ES22", new BigDecimal("10.00"), "ES", "Exito");
 		TransferenciaDTO dtoErrorDb = new TransferenciaDTO("ES33", "ES44", new BigDecimal("10.00"), "ES", "DB Error");
 		TransferenciaDTO dtoDeadlock = new TransferenciaDTO("ES55", "ES66", new BigDecimal("10.00"), "ES", "Deadlock");
@@ -204,28 +201,22 @@ class TransaccionProcesadorTest {
 
 		List<TransferenciaDTO> sublote = List.of(dtoExito, dtoErrorDb, dtoDeadlock, dtoUnknown);
 
-		// Lenient se usa para evitar 'UnnecessaryStubbingException' ya que algunos
-		// fallan a la mitad
 		lenient().when(transaccionRepository.save(any(Transaccion.class))).thenReturn(transaccion);
 
-		// Para dtoExito
 		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
-		lenient().when(fraudeScoreCalculator.calcularScore(dtoExito)).thenReturn(0.1);
 
-		// Para dtoErrorDb
+		lenient().when(fraudeScoreCalculator.calcularScore(dtoExito)).thenReturn(new ResultadoFraude(0.1, List.of()));
+
 		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES33"))
 				.thenThrow(new RuntimeException("JDBC exception: Connection timeout"));
 
-		// Para dtoDeadlock
 		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES55"))
 				.thenThrow(new RuntimeException("JDBC exception: Deadlock found when trying to get lock"));
 
-		// Para dtoUnknown (Mensaje null simulado)
 		lenient().when(cuentaRepository.findByNumeroCuentaWithLock("ES77"))
 				.thenThrow(new RuntimeException((String) null));
 
-		// Ejecutamos con offset inicial 10
 		CompletableFuture<ResumenLoteDTO> future = transaccionProcesador.procesarSubloteAsync(sublote, 10);
 		ResumenLoteDTO result = future.join();
 
@@ -233,8 +224,6 @@ class TransaccionProcesadorTest {
 		assertEquals(1, result.totalExitosas());
 		assertEquals(3, result.totalFallidas());
 
-		// Validamos el parseo e interceptación de los mensajes críticos de base de
-		// datos
 		String resultadosString = result.detallesRechazo().toString();
 		assertTrue(resultadosString.contains("Error interno de base de datos al procesar la transacción."));
 		assertTrue(resultadosString.contains("Interbloqueo detectado por alta concurrencia"));

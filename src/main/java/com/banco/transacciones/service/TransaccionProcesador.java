@@ -144,8 +144,7 @@ public class TransaccionProcesador {
 	}
 
 	/**
-	 * Centralización de la lógica para evitar "Code Smells" (Código duplicado) en
-	 * SonarQube.
+	 * Aplicar reglas de negocio.
 	 */
 	private void aplicarReglasDeNegocio(Transaccion tx, TransferenciaDTO dto) {
 		// Bloqueo Pesimista (causante de los Deadlocks sanos de base de datos en alta
@@ -167,19 +166,24 @@ public class TransaccionProcesador {
 			throw new SaldoInsuficienteException("Saldo insuficiente para la transacción.");
 		}
 
-		double fraudeScore = fraudeScoreCalculator.calcularScore(dto);
+		// Implementación con captura de motivos (Score y Detalles)
+		var resultadoFraude = fraudeScoreCalculator.calcularScore(dto);
+		double fraudeScore = resultadoFraude.score();
+		String motivoDetallado = String.join(", ", resultadoFraude.motivos());
+
 		tx.setRiesgoFraude(fraudeScore);
 
 		if (fraudeScore > 0.75) {
 			tx.setEstado(EstadoTransaccion.RECHAZADA);
 			transaccionRepository.save(tx);
-			generarAlerta(tx, NivelRiesgo.CRITICO);
-			log.warn("Transacción RECHAZADA por alto riesgo de fraude (Score: {}).", fraudeScore);
+			generarAlerta(tx, NivelRiesgo.CRITICO, motivoDetallado);
+			log.warn("Transacción RECHAZADA por alto riesgo de fraude (Score: {}). Motivos: {}", fraudeScore,
+					motivoDetallado);
 			return;
 		}
 
 		if (fraudeScore > 0.50) {
-			generarAlerta(tx, NivelRiesgo.ALTO);
+			generarAlerta(tx, NivelRiesgo.ALTO, motivoDetallado);
 		}
 
 		cuentaOrigen.setSaldo(cuentaOrigen.getSaldo().subtract(dto.monto()));
@@ -199,8 +203,11 @@ public class TransaccionProcesador {
 				.estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now()).build();
 	}
 
-	private void generarAlerta(Transaccion tx, NivelRiesgo nivelRiesgo) {
-		AlertaFraude alerta = AlertaFraude.builder().transaccion(tx).nivel(nivelRiesgo).revisada(false).build();
+	private void generarAlerta(Transaccion tx, NivelRiesgo nivelRiesgo, String motivo) {
+		AlertaFraude alerta = AlertaFraude.builder().transaccion(tx).nivel(nivelRiesgo).motivo(motivo) // Se inyecta el
+																										// motivo
+																										// consolidado
+				.revisada(false).build();
 		alertaFraudeRepository.save(alerta);
 	}
 }
