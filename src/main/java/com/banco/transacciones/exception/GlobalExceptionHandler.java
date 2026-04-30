@@ -29,7 +29,7 @@ public class GlobalExceptionHandler {
 
 	private static final String VALIDATION_ERROR = "Validation Error";
 	private static final String ERROR_INTERNO = "Error interno";
-	
+
 	// ==========================================
 	// EXCEPCIONES DE NEGOCIO Y DOMINIO
 	// ==========================================
@@ -105,10 +105,10 @@ public class GlobalExceptionHandler {
 		return buildResponse(HttpStatus.BAD_REQUEST, VALIDATION_ERROR,
 				"El lote no puede estar vacío y debe tener un máximo de 500 registros.", request.getRequestURI());
 	}
-	
+
 	@ExceptionHandler(NoResourceFoundException.class)
 	public ResponseEntity<Void> handleNoResourceFoundException(NoResourceFoundException ex) {
-		if (ex.getResourcePath() != null && ex.getResourcePath().contains("favicon.ico")) {
+		if (ex.getResourcePath().contains("favicon.ico")) {
 			return ResponseEntity.noContent().build();
 		}
 		return ResponseEntity.notFound().build();

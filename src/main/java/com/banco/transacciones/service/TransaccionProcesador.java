@@ -204,9 +204,7 @@ public class TransaccionProcesador {
 	}
 
 	private void generarAlerta(Transaccion tx, NivelRiesgo nivelRiesgo, String motivo) {
-		AlertaFraude alerta = AlertaFraude.builder().transaccion(tx).nivel(nivelRiesgo).motivo(motivo) // Se inyecta el
-																										// motivo
-																										// consolidado
+		AlertaFraude alerta = AlertaFraude.builder().transaccion(tx).nivel(nivelRiesgo).motivo(motivo)
 				.revisada(false).build();
 		alertaFraudeRepository.save(alerta);
 	}
