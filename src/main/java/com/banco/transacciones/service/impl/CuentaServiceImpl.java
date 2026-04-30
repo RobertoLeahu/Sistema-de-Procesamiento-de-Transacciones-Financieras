@@ -62,6 +62,10 @@ public class CuentaServiceImpl {
 			sumaMontos = sumaMontos.add(tx.getMonto());
 			if (tx.getRiesgoFraude() != null) {
 				puntuacionRiesgoAcumulada += tx.getRiesgoFraude();
+				
+				if (tx.getRiesgoFraude() > 0.75) {
+					alertasCriticas++;
+				}
 			}
 		}
 
