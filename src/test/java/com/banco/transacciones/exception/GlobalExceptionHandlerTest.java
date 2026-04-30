@@ -2,6 +2,10 @@ package com.banco.transacciones.exception;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,10 +16,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.banco.transacciones.controller.TestExceptionController;
+import com.banco.transacciones.dto.response.ErrorResponse;
 
 /**
  * Clase de pruebas unitarias para {@link GlobalExceptionHandler}. Se utiliza el
@@ -157,5 +168,75 @@ class GlobalExceptionHandlerTest {
 		mockMvc.perform(get("/test/handler-method").param("param", "123")) // Fuerza el fallo del @Size(min=5)
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.status", is(400)))
 				.andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
+	}
+
+	/**
+	 * Verifica el manejo directo de la excepción de validación de métodos.
+	 * Instanciar el manejador directamente permite simular el error interno de
+	 * Spring y asegurar el 100% de cobertura sin la complejidad del entorno
+	 * MockMvc. Se espera un estado HTTP 400.
+	 */
+	@Test
+	@DisplayName("Debe manejar HandlerMethodValidationException de forma directa")
+	void testHandleHandlerMethodValidationDirect() {
+		GlobalExceptionHandler handler = new GlobalExceptionHandler();
+		HandlerMethodValidationException ex = mock(HandlerMethodValidationException.class);
+		when(ex.getMessage()).thenReturn("Validation failed");
+
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.setRequestURI("/api/test");
+
+		ResponseEntity<ErrorResponse> response = handler.handleHandlerMethodValidation(ex, request);
+
+		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertNotNull(response.getBody());
+	}
+
+	/**
+	 * Verifica que las peticiones automáticas de navegadores web buscando el icono
+	 * 'favicon.ico' sean interceptadas y respondidas silenciosamente con un código
+	 * HTTP 204 (No Content) para evitar ensuciar los logs de la aplicación.
+	 */
+	@Test
+	@DisplayName("Debe retornar 204 para favicon.ico de forma directa")
+	void testHandleNoResourceFoundException_FaviconDirect() {
+		GlobalExceptionHandler handler = new GlobalExceptionHandler();
+		NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "favicon.ico");
+
+		ResponseEntity<Void> response = handler.handleNoResourceFoundException(ex);
+
+		assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+	}
+
+	/**
+	 * Verifica que cualquier petición a un recurso estático inexistente (distinto
+	 * al favicon) siga el flujo habitual y retorne un error HTTP 404 (Not Found).
+	 */
+	@Test
+	@DisplayName("Debe retornar 404 para recursos estáticos desconocidos")
+	void testHandleNoResourceFoundException_OtherResource() {
+		GlobalExceptionHandler handler = new GlobalExceptionHandler();
+		NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "styles.css");
+
+		ResponseEntity<Void> response = handler.handleNoResourceFoundException(ex);
+
+		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+	}
+
+	/**
+	 * Valida la robustez de la lógica de intercepción del favicon ante valores
+	 * atípicos. Si la excepción de Spring trae un recurso nulo, no debe lanzar
+	 * NullPointerException y debe devolver el código HTTP 404 (Not Found) habitual.
+	 */
+	@Test
+	@DisplayName("Debe retornar 404 cuando el path del recurso es nulo")
+	void testHandleNoResourceFoundException_NullPath() {
+		GlobalExceptionHandler handler = new GlobalExceptionHandler();
+		NoResourceFoundException ex = mock(NoResourceFoundException.class);
+		when(ex.getResourcePath()).thenReturn(null); // Cubre la condición `path != null` evaluada a false
+
+		ResponseEntity<Void> response = handler.handleNoResourceFoundException(ex);
+
+		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
 	}
 }

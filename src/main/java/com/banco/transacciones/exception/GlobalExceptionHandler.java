@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.banco.transacciones.dto.response.ErrorResponse;
 
@@ -103,6 +104,14 @@ public class GlobalExceptionHandler {
 		log.warn("Error de validación de método (Spring 3.x): {}", ex.getMessage());
 		return buildResponse(HttpStatus.BAD_REQUEST, VALIDATION_ERROR,
 				"El lote no puede estar vacío y debe tener un máximo de 500 registros.", request.getRequestURI());
+	}
+	
+	@ExceptionHandler(NoResourceFoundException.class)
+	public ResponseEntity<Void> handleNoResourceFoundException(NoResourceFoundException ex) {
+		if (ex.getResourcePath() != null && ex.getResourcePath().contains("favicon.ico")) {
+			return ResponseEntity.noContent().build();
+		}
+		return ResponseEntity.notFound().build();
 	}
 
 	// ==========================================
