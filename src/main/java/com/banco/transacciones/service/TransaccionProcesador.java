@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -47,16 +46,16 @@ public class TransaccionProcesador {
 	private final FraudeScoreCalculator fraudeScoreCalculator;
 	private final AlertaFraudeRepository alertaFraudeRepository;
 
-	@Lazy
-	@Autowired
-	private TransaccionProcesador self;
+	private final TransaccionProcesador self;
 
 	public TransaccionProcesador(CuentaRepository cuentaRepository, TransaccionRepository transaccionRepository,
-			FraudeScoreCalculator fraudeScoreCalculator, AlertaFraudeRepository alertaFraudeRepository) {
+			FraudeScoreCalculator fraudeScoreCalculator, AlertaFraudeRepository alertaFraudeRepository,
+			@Lazy TransaccionProcesador self) {
 		this.cuentaRepository = cuentaRepository;
 		this.transaccionRepository = transaccionRepository;
 		this.fraudeScoreCalculator = fraudeScoreCalculator;
 		this.alertaFraudeRepository = alertaFraudeRepository;
+		this.self = self;
 	}
 
 	/**
@@ -70,8 +69,6 @@ public class TransaccionProcesador {
 		} catch (Exception e) {
 			log.error("Fallo inesperado al procesar asíncronamente la transacción {}: {}", transaccionId,
 					e.getMessage());
-			// Opcional: Aquí podrías buscar la transacción y marcarla como REVERTIDA o
-			// ERROR de sistema.
 		}
 	}
 
