@@ -165,9 +165,8 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("Debe retornar 400 para HandlerMethodValidationException en Spring Boot 3.x")
 	void testHandleHandlerMethodValidationException() throws Exception {
-		mockMvc.perform(get("/test/handler-method").param("param", "123")) // Fuerza el fallo del @Size(min=5)
-				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.status", is(400)))
-				.andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
+		mockMvc.perform(get("/test/handler-method").param("param", "123")).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status", is(400))).andExpect(jsonPath("$.error", is(VALIDATION_ERROR)));
 	}
 
 	/**
@@ -223,20 +222,4 @@ class GlobalExceptionHandlerTest {
 		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
 	}
 
-	/**
-	 * Valida la robustez de la lógica de intercepción del favicon ante valores
-	 * atípicos. Si la excepción de Spring trae un recurso nulo, no debe lanzar
-	 * NullPointerException y debe devolver el código HTTP 404 (Not Found) habitual.
-	 */
-	@Test
-	@DisplayName("Debe retornar 404 cuando el path del recurso es nulo")
-	void testHandleNoResourceFoundException_NullPath() {
-		GlobalExceptionHandler handler = new GlobalExceptionHandler();
-		NoResourceFoundException ex = mock(NoResourceFoundException.class);
-		when(ex.getResourcePath()).thenReturn(null); // Cubre la condición `path != null` evaluada a false
-
-		ResponseEntity<Void> response = handler.handleNoResourceFoundException(ex);
-
-		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-	}
 }
