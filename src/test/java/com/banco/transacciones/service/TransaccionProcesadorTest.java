@@ -40,7 +40,6 @@ import com.banco.transacciones.dto.response.ResultadoFraude;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
 import com.banco.transacciones.exception.CuentaNotFoundException;
-import com.banco.transacciones.exception.SaldoInsuficienteException;
 import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
