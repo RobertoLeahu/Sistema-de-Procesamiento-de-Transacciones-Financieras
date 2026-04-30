@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -142,7 +141,7 @@ class TransaccionServiceImplTest {
 		verify(transaccionRepository, times(1)).save(any(Transaccion.class));
 
 		// Verificamos el BUGFIX: Debe enviarse explícitamente el ID (1L) y el DTO
-		verify(transaccionProcesador, times(1)).procesarTransferenciaAsync(eq(1L), eq(transferenciaDTO));
+		verify(transaccionProcesador, times(1)).procesarTransferenciaAsync(1L, transferenciaDTO);
 		verify(mapper, times(1)).toDto(any(Transaccion.class));
 	}
 }
