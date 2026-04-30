@@ -32,34 +32,28 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class TransaccionServiceImpl {
 
-	private final TransaccionProcesador transaccionProcesador;
 	private final TransaccionRepository transaccionRepository;
 	private final TransaccionMapper transaccionMapper;
+	private final TransaccionProcesador transaccionProcesador;
 
-	/**
-	 * Inicia el proceso de transferencia. Guarda el estado PENDIENTE síncronamente
-	 * para obtener un ID real y delega el análisis pesado a un hilo secundario
-	 * asíncrono.
-	 */
+	@Transactional
 	public TransaccionDTO iniciarTransferencia(TransferenciaDTO dto) {
-		log.info("Entrada: Orquestando inicio asíncrono para transferencia de {} a {}", dto.cuentaOrigen(),
+		log.info("Entrada: Iniciando transferencia asíncrona de cuenta {} a cuenta {}", dto.cuentaOrigen(),
 				dto.cuentaDestino());
 
-		// 1. Guardamos la transacción preliminar de forma síncrona para que Hibernate
-		// genere el ID.
-		Transaccion txInicial = Transaccion.builder().cuentaOrigen(dto.cuentaOrigen())
-				.cuentaDestino(dto.cuentaDestino()).monto(dto.monto()).codigoPais(dto.codigoPais())
-				.tipo(TipoTransaccion.TRANSFERENCIA).estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now())
-				.build();
+		Transaccion tx = Transaccion.builder().cuentaOrigen(dto.cuentaOrigen()).cuentaDestino(dto.cuentaDestino())
+				.monto(dto.monto()).codigoPais(dto.codigoPais()).tipo(TipoTransaccion.TRANSFERENCIA)
+				.estado(EstadoTransaccion.PENDIENTE).fechaHora(Instant.now()).build();
 
-		txInicial = transaccionRepository.save(txInicial);
-		log.info("Transacción preliminar guardada con éxito en BD. TX ID real asignado: {}", txInicial.getId());
+		tx = transaccionRepository.save(tx);
+		log.debug("Transacción inicial persistida con estado PENDIENTE. ID: {}", tx.getId());
 
-		// 2. Delegamos el procesamiento pesado (score, bloqueos) pasándole el ID real.
-		transaccionProcesador.procesarTransferenciaAsync(txInicial.getId(), dto);
+		log.debug("Delegando procesamiento concurrente al pool de hilos.");
+		transaccionProcesador.procesarTransferencia(dto); // Corregido a delegar la lógica
 
-		log.info("Salida: Tarea asíncrona delegada con éxito. Retornando acuse de recibo.");
-		return transaccionMapper.toDto(txInicial);
+		TransaccionDTO response = transaccionMapper.toDto(tx);
+		log.info("Salida: Transferencia aceptada para procesamiento. ID: {}", response.id());
+		return response;
 	}
 
 	/**
@@ -74,25 +68,19 @@ public class TransaccionServiceImpl {
 
 		for (int i = 0; i < lote.size(); i += size) {
 			int endIndex = Math.min(i + size, lote.size());
-
-			// Partir el lote en sublotes de 50.
-			// Clonar el subList en un nuevo ArrayList para evitar
-			// problemas de concurrencia al leer la memoria compartida de la lista original.
 			List<TransferenciaDTO> sublote = new ArrayList<>(lote.subList(i, endIndex));
 
 			log.debug("Generando fragmentación: enviando sublote de tamaño {} (índices {} a {})", sublote.size(), i,
 					endIndex - 1);
-			futuros.add(transaccionProcesador.procesarSubloteAsync(sublote));
+
+			futuros.add(transaccionProcesador.procesarSubloteAsync(sublote, i));
 		}
 
 		log.debug("Esperando la resolución de {} hilos de ejecución...", futuros.size());
 
-		// Esperar de forma segura a que todos los hilos terminen
-		CompletableFuture.allOf(futuros.toArray(new CompletableFuture[0])).join();
-
-		// Agregar los resultados y retornar un resumen
-		ResumenLoteDTO resumen = futuros.stream().map(CompletableFuture::join).reduce(new ResumenLoteDTO(0, 0, 0),
-				ResumenLoteDTO::sumar);
+		// Reducir resultados usando el acumulador neutral
+		ResumenLoteDTO resumen = futuros.stream().map(CompletableFuture::join)
+				.reduce(new ResumenLoteDTO(0, 0, 0, new ArrayList<>()), ResumenLoteDTO::sumar);
 
 		log.info("Salida: Lote procesado totalmente. Exitosas: {}, Fallidas: {}", resumen.totalExitosas(),
 				resumen.totalFallidas());
@@ -105,13 +93,12 @@ public class TransaccionServiceImpl {
 
 		Transaccion tx = transaccionRepository.findById(id).orElseThrow(() -> {
 			log.error("Consulta fallida: Transacción con ID {} no fue encontrada en sistema", id);
-			return new TransaccionNotFoundException("Transacción no encontrada con id: " + id);
+			return new TransaccionNotFoundException("Transacción no encontrada");
 		});
 
-		log.debug("Mapeando entidad Transaccion a capa DTO inmutable para TX ID: {}", id);
-		TransaccionDTO dto = transaccionMapper.toDto(tx);
-
-		log.info("Salida: Estado de TX ID: {} validado como {}", id, dto.estado());
-		return dto;
+		TransaccionDTO response = transaccionMapper.toDto(tx);
+		log.info("Salida: Transacción encontrada. Estado: {}", response.estado());
+		return response;
 	}
+
 }
