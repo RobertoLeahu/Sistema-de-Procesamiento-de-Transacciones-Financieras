@@ -23,7 +23,6 @@ import com.banco.transacciones.dto.response.DetalleRechazoDTO;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
 import com.banco.transacciones.exception.CuentaNotFoundException;
-import com.banco.transacciones.exception.SaldoInsuficienteException;
 import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
@@ -149,21 +148,22 @@ public class TransaccionProcesador {
 	private void aplicarReglasDeNegocio(Transaccion tx, TransferenciaDTO dto) {
 		// Bloqueo Pesimista (causante de los Deadlocks sanos de base de datos en alta
 		// concurrencia)
-		Cuenta cuentaOrigen = cuentaRepository.findByNumeroCuentaWithLock(dto.cuentaOrigen())
-				.orElseThrow(() -> new CuentaNotFoundException("Cuenta origen no encontrada: " + dto.cuentaOrigen()));
+		boolean origenPrimero = dto.cuentaOrigen().compareTo(dto.cuentaDestino()) < 0;
+		String primeraLock = origenPrimero ? dto.cuentaOrigen() : dto.cuentaDestino();
+		String segundaLock = origenPrimero ? dto.cuentaDestino() : dto.cuentaOrigen();
 
-		Cuenta cuentaDestino = cuentaRepository.findByNumeroCuentaWithLock(dto.cuentaDestino())
-				.orElseThrow(() -> new CuentaNotFoundException("Cuenta destino no encontrada: " + dto.cuentaDestino()));
+		Cuenta primeraCuenta = cuentaRepository.findByNumeroCuentaWithLock(primeraLock)
+				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada: " + primeraLock));
+
+		Cuenta segundaCuenta = cuentaRepository.findByNumeroCuentaWithLock(segundaLock)
+				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada: " + segundaLock));
+
+		// Reasignamos a los roles lógicos de la transacción
+		Cuenta cuentaOrigen = origenPrimero ? primeraCuenta : segundaCuenta;
+		Cuenta cuentaDestino = origenPrimero ? segundaCuenta : primeraCuenta;
 
 		if (cuentaOrigen.getEstado() != EstadoCuenta.ACTIVADA) {
 			throw new CuentaBloqueadaException("La cuenta origen no está activa.");
-		}
-		if (cuentaDestino.getEstado() != EstadoCuenta.ACTIVADA) {
-			throw new CuentaBloqueadaException("La cuenta destino no está activa.");
-		}
-
-		if (cuentaOrigen.getSaldo().compareTo(dto.monto()) < 0) {
-			throw new SaldoInsuficienteException("Saldo insuficiente para la transacción.");
 		}
 
 		// Implementación con captura de motivos (Score y Detalles)
@@ -204,8 +204,8 @@ public class TransaccionProcesador {
 	}
 
 	private void generarAlerta(Transaccion tx, NivelRiesgo nivelRiesgo, String motivo) {
-		AlertaFraude alerta = AlertaFraude.builder().transaccion(tx).nivel(nivelRiesgo).motivo(motivo)
-				.revisada(false).build();
+		AlertaFraude alerta = AlertaFraude.builder().transaccion(tx).nivel(nivelRiesgo).motivo(motivo).revisada(false)
+				.build();
 		alertaFraudeRepository.save(alerta);
 	}
 }
