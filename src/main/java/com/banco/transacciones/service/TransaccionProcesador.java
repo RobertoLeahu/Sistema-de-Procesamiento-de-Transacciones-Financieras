@@ -22,9 +22,8 @@ import com.banco.transacciones.dto.request.TransferenciaDTO;
 import com.banco.transacciones.dto.response.DetalleRechazoDTO;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
-import com.banco.transacciones.exception.CuentaNotFoundException;
+import com.banco.transacciones.exception.ResourceNotFoundException;
 import com.banco.transacciones.exception.SaldoInsuficienteException;
-import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
 import com.banco.transacciones.repository.TransaccionRepository;
@@ -125,7 +124,7 @@ public class TransaccionProcesador {
 	public void procesarTransferencia(Long transaccionId, TransferenciaDTO dto) {
 		log.debug("Ejecutando lógica de negocio para transacción existente en hilo asíncrono.");
 		Transaccion tx = transaccionRepository.findById(transaccionId).orElseThrow(
-				() -> new TransaccionNotFoundException("Transacción inicial no encontrada: " + transaccionId));
+				() -> new ResourceNotFoundException("Transacción inicial no encontrada: " + transaccionId));
 
 		aplicarReglasDeNegocio(tx, dto);
 	}
@@ -154,10 +153,10 @@ public class TransaccionProcesador {
 		String segundaLock = origenPrimero ? dto.cuentaDestino() : dto.cuentaOrigen();
 
 		Cuenta primeraCuenta = cuentaRepository.findByNumeroCuentaWithLock(primeraLock)
-				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada: " + primeraLock));
+				.orElseThrow(() -> new ResourceNotFoundException("Cuenta no encontrada: " + primeraLock));
 
 		Cuenta segundaCuenta = cuentaRepository.findByNumeroCuentaWithLock(segundaLock)
-				.orElseThrow(() -> new CuentaNotFoundException("Cuenta no encontrada: " + segundaLock));
+				.orElseThrow(() -> new ResourceNotFoundException("Cuenta no encontrada: " + segundaLock));
 
 		// Reasignamos a los roles lógicos de la transacción
 		Cuenta cuentaOrigen = origenPrimero ? primeraCuenta : segundaCuenta;

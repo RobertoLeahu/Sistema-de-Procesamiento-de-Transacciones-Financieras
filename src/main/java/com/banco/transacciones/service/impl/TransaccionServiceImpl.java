@@ -14,7 +14,7 @@ import com.banco.transacciones.domain.models.Transaccion;
 import com.banco.transacciones.dto.request.TransferenciaDTO;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.dto.response.TransaccionDTO;
-import com.banco.transacciones.exception.TransaccionNotFoundException;
+import com.banco.transacciones.exception.ResourceNotFoundException;
 import com.banco.transacciones.mapper.TransaccionMapper;
 import com.banco.transacciones.repository.TransaccionRepository;
 import com.banco.transacciones.service.TransaccionProcesador;
@@ -96,12 +96,11 @@ public class TransaccionServiceImpl {
 
 		Transaccion tx = transaccionRepository.findById(id).orElseThrow(() -> {
 			log.error("Consulta fallida: Transacción con ID {} no fue encontrada en sistema", id);
-			return new TransaccionNotFoundException("Transacción no encontrada");
+			return new ResourceNotFoundException("Transacción con ID " + id + " no encontrada");
 		});
 
 		TransaccionDTO response = transaccionMapper.toDto(tx);
 		log.info("Salida: Transacción encontrada. Estado: {}", response.estado());
 		return response;
 	}
-
 }
