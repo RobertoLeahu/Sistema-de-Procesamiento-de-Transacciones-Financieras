@@ -40,6 +40,7 @@ import com.banco.transacciones.dto.response.ResultadoFraude;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
 import com.banco.transacciones.exception.CuentaNotFoundException;
+import com.banco.transacciones.exception.SaldoInsuficienteException;
 import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
@@ -84,8 +85,8 @@ class TransaccionProcesadorTest {
 
 		dto = new TransferenciaDTO("ES11", "ES22", new BigDecimal("100.00"), "ES", "Prueba");
 
-		cuentaOrigen = Cuenta.builder().numeroCuenta("ES11").saldo(new BigDecimal("500.00"))
-				.estado(EstadoCuenta.ACTIVADA).build();
+		cuentaOrigen = Cuenta.builder().numeroCuenta("ES11").saldo(new BigDecimal("500.00")).estado(EstadoCuenta.ACTIVADA)
+				.build();
 		cuentaDestino = Cuenta.builder().numeroCuenta("ES22").saldo(new BigDecimal("100.00"))
 				.estado(EstadoCuenta.ACTIVADA).build();
 
@@ -142,11 +143,23 @@ class TransaccionProcesadorTest {
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
 
-		// PREVENCIÓN NPE: Habilitamos el mock del score de fraude usando lenient por si
-		// se evalúa antes de lanzar la excepción
 		lenient().when(fraudeScoreCalculator.calcularScore(dto)).thenReturn(new ResultadoFraude(0.1, List.of()));
 
 		assertThrows(CuentaBloqueadaException.class, () -> transaccionProcesador.procesarTransferencia(dto));
+	}
+
+	@Test
+	@DisplayName("Lógica de Negocio - Excepción por Saldo Insuficiente")
+	void testEjecutarLogicaTransaccion_SaldoInsuficiente() {
+		// La cuenta origen en setUp tiene 500.00. Creamos una petición de 1000.00
+		TransferenciaDTO dtoMontoExcesivo = new TransferenciaDTO("ES11", "ES22", new BigDecimal("1000.00"), "ES",
+				"Prueba");
+
+		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
+		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
+
+		assertThrows(SaldoInsuficienteException.class,
+				() -> transaccionProcesador.procesarTransferencia(dtoMontoExcesivo));
 	}
 
 	@Test
@@ -182,15 +195,13 @@ class TransaccionProcesadorTest {
 		verify(alertaFraudeRepository, times(1)).save(any(AlertaFraude.class));
 	}
 
-	// NUEVO TEST: Cumpliendo el 95% de SonarQube certificando la rama del Deadlock
 	@Test
 	@DisplayName("Concurrencia - Prevención de Deadlock (Ordenamiento Inverso)")
 	void testPrevencionDeadlock_OrdenInverso() {
 		// La cuenta origen (ES22) es alfabéticamente MAYOR que la destino (ES11)
 		TransferenciaDTO dtoInverso = new TransferenciaDTO("ES22", "ES11", new BigDecimal("50.00"), "ES", "Prueba");
 
-		// Mockeamos usando las cuentas de setUp (cuentaOrigen tiene ES11, cuentaDestino
-		// tiene ES22)
+		// Mockeamos usando las cuentas de setUp (cuentaOrigen tiene ES11, cuentaDestino tiene ES22)
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES11")).thenReturn(Optional.of(cuentaOrigen));
 		when(cuentaRepository.findByNumeroCuentaWithLock("ES22")).thenReturn(Optional.of(cuentaDestino));
 
@@ -198,7 +209,7 @@ class TransaccionProcesadorTest {
 
 		assertDoesNotThrow(() -> transaccionProcesador.procesarTransferencia(dtoInverso));
 
-		// VERIFICACIÓN CIENTÍFICA: Garantizamos que ES11 se bloqueó PRIMERO que ES22,
+		// Garantizamos que ES11 se bloqueó PRIMERO que ES22,
 		// a pesar de que ES11 es el "destino" en este test. Esto asegura que no hay
 		// deadlocks cruzados.
 		InOrder ordenBloqueos = inOrder(cuentaRepository);

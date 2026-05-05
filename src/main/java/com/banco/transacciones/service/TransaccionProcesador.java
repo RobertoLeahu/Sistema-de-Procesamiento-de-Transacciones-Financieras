@@ -23,6 +23,7 @@ import com.banco.transacciones.dto.response.DetalleRechazoDTO;
 import com.banco.transacciones.dto.response.ResumenLoteDTO;
 import com.banco.transacciones.exception.CuentaBloqueadaException;
 import com.banco.transacciones.exception.CuentaNotFoundException;
+import com.banco.transacciones.exception.SaldoInsuficienteException;
 import com.banco.transacciones.exception.TransaccionNotFoundException;
 import com.banco.transacciones.repository.AlertaFraudeRepository;
 import com.banco.transacciones.repository.CuentaRepository;
@@ -162,11 +163,20 @@ public class TransaccionProcesador {
 		Cuenta cuentaOrigen = origenPrimero ? primeraCuenta : segundaCuenta;
 		Cuenta cuentaDestino = origenPrimero ? segundaCuenta : primeraCuenta;
 
+		// 1. Validar Estado de la Cuenta
 		if (cuentaOrigen.getEstado() != EstadoCuenta.ACTIVADA) {
 			throw new CuentaBloqueadaException("La cuenta origen no está activa.");
 		}
 
-		// Implementación con captura de motivos (Score y Detalles)
+		// 2. Validar Saldo Suficiente
+		if (cuentaOrigen.getSaldo().compareTo(dto.monto()) < 0) {
+			log.warn("Transacción rechazada: Saldo insuficiente en cuenta {}. Saldo actual: {}, Monto requerido: {}",
+					cuentaOrigen.getNumeroCuenta(), cuentaOrigen.getSaldo(), dto.monto());
+			throw new SaldoInsuficienteException(
+					"La cuenta " + cuentaOrigen.getNumeroCuenta() + " no tiene saldo suficiente para la operación");
+		}
+
+		// 3. Implementación con captura de motivos de Fraude (Score y Detalles)
 		var resultadoFraude = fraudeScoreCalculator.calcularScore(dto);
 		double fraudeScore = resultadoFraude.score();
 		String motivoDetallado = String.join(", ", resultadoFraude.motivos());
@@ -186,6 +196,7 @@ public class TransaccionProcesador {
 			generarAlerta(tx, NivelRiesgo.ALTO, motivoDetallado);
 		}
 
+		// 4. Procesar Movimiento de Dinero
 		cuentaOrigen.setSaldo(cuentaOrigen.getSaldo().subtract(dto.monto()));
 		cuentaDestino.setSaldo(cuentaDestino.getSaldo().add(dto.monto()));
 
