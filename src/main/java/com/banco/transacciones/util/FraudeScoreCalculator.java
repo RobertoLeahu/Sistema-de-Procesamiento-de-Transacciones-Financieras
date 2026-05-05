@@ -12,6 +12,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.banco.transacciones.domain.models.Cliente;
 import com.banco.transacciones.domain.models.Cuenta;
 import com.banco.transacciones.dto.request.TransferenciaDTO;
 import com.banco.transacciones.dto.response.ResultadoFraude;
@@ -103,11 +104,23 @@ public class FraudeScoreCalculator {
 		return new ResultadoFraude(Math.min(score, 1.0), motivos);
 	}
 
+	/**
+	 * Verifica si el país de la transferencia es inusual basándose en el historial.
+	 */
 	private boolean esPaisInusual(TransferenciaDTO request) {
-		String paisHabitual = transaccionRepository.findPaisHabitual(request.cuentaOrigen())
-				.orElseGet(() -> cuentaRepository.findByNumeroCuenta(request.cuentaOrigen())
-						.map(c -> c.getCliente().getPaisResidencia()).orElse("XX"));
+		// 1. Buscamos el país más frecuente en el historial
+		Optional<String> paisHistorial = transaccionRepository.findPaisHabitual(request.cuentaOrigen());
+		
+		if (paisHistorial.isPresent()) {
+			return !request.codigoPais().equalsIgnoreCase(paisHistorial.get());
+		}
 
-		return !request.codigoPais().equalsIgnoreCase(paisHabitual);
+		// 2. Si no hay historial, usamos el país de residencia del cliente como "habitual"
+		String paisResidencia = cuentaRepository.findByNumeroCuenta(request.cuentaOrigen())
+				.map(Cuenta::getCliente)
+				.map(Cliente::getPaisResidencia)
+				.orElse(request.codigoPais());
+
+		return !request.codigoPais().equalsIgnoreCase(paisResidencia);
 	}
 }

@@ -207,8 +207,8 @@ class FraudeScoreCalculatorTest {
 	}
 
 	@Test
-	@DisplayName("Evalúa país inusual usando 'XX' (extremo) cuando no hay historial ni cuenta origen")
-	void calcularScore_PaisInusual_FallbackNulo_SumaDiez() {
+	@DisplayName("Evalúa país inusual usando fallback seguro cuando no hay historial ni cuenta origen")
+	void calcularScore_PaisInusual_FallbackNulo_NoSumaPuntos() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), "US");
 
 		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(eq(CUENTA_ORIGEN), any(Instant.class)))
@@ -221,8 +221,8 @@ class FraudeScoreCalculatorTest {
 
 		ResultadoFraude resultado = calculator.calcularScore(request);
 
-		assertEquals(0.10, resultado.score(), 0.001);
-		assertTrue(resultado.motivos().get(0).contains("País destino inusual (US)"));
+		assertEquals(0.0, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().isEmpty(), "No debe registrar motivos de país si no hay historial previo");
 	}
 
 	@Test
