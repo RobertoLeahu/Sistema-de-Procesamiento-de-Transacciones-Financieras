@@ -23,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.banco.transacciones.domain.models.Cliente;
 import com.banco.transacciones.domain.models.Cuenta;
@@ -74,6 +75,14 @@ class FraudeScoreCalculatorTest {
 	void setUp() {
 		Mockito.lenient().when(clock.instant()).thenReturn(INSTANT_DIURNO);
 		Mockito.lenient().when(clock.getZone()).thenReturn(ZoneId.systemDefault());
+
+		// Inyectar manualmente las propiedades @Value usando ReflectionTestUtils
+		ReflectionTestUtils.setField(calculator, "pesoMonto", 0.30);
+		ReflectionTestUtils.setField(calculator, "pesoHora", 0.20);
+		ReflectionTestUtils.setField(calculator, "pesoFrecuencia", 0.25);
+		ReflectionTestUtils.setField(calculator, "pesoAntiguedad", 0.15);
+		ReflectionTestUtils.setField(calculator, "pesoPais", 0.10);
+		ReflectionTestUtils.setField(calculator, "umbralMonto", new BigDecimal("10000.00"));
 	}
 
 	@Test
@@ -101,7 +110,7 @@ class FraudeScoreCalculatorTest {
 
 		assertEquals(1.0, resultado.score(), 0.001);
 		assertEquals(5, resultado.motivos().size(), "Deben registrarse exactamente 5 motivos");
-		assertTrue(resultado.motivos().contains("Monto elevado (>10.000)"));
+		assertTrue(resultado.motivos().contains("Monto elevado (>10000.00)"));
 		assertTrue(resultado.motivos().contains("Horario inusual (00:00-05:00)"));
 		assertTrue(resultado.motivos().contains("Alta frecuencia (>3 transacciones en 5 min)"));
 		assertTrue(resultado.motivos().contains("Cuenta destino reciente (<7 días)"));
@@ -118,7 +127,7 @@ class FraudeScoreCalculatorTest {
 
 		assertEquals(0.30, resultado.score(), 0.001);
 		assertEquals(1, resultado.motivos().size());
-		assertEquals("Monto elevado (>10.000)", resultado.motivos().get(0));
+		assertEquals("Monto elevado (>10000.00)", resultado.motivos().get(0));
 	}
 
 	@Test
@@ -198,6 +207,25 @@ class FraudeScoreCalculatorTest {
 	}
 
 	@Test
+	@DisplayName("Evalúa país inusual usando 'XX' (extremo) cuando no hay historial ni cuenta origen")
+	void calcularScore_PaisInusual_FallbackNulo_SumaDiez() {
+		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), "US");
+
+		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(eq(CUENTA_ORIGEN), any(Instant.class)))
+				.thenReturn(0L);
+		// Sin historial
+		when(transaccionRepository.findPaisHabitual(CUENTA_ORIGEN)).thenReturn(Optional.empty());
+		// Sin cuenta origen para buscar el país de residencia del cliente
+		when(cuentaRepository.findByNumeroCuenta(CUENTA_ORIGEN)).thenReturn(Optional.empty());
+		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.empty());
+
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.10, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().get(0).contains("País destino inusual (US)"));
+	}
+
+	@Test
 	@DisplayName("No debe sumar puntos ni motivos si la cuenta destino no existe")
 	void calcularScore_CuentaDestinoInexistente_NoSumaAntiguedad() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
@@ -213,13 +241,32 @@ class FraudeScoreCalculatorTest {
 	}
 
 	@Test
-	@DisplayName("Debe manejar correctamente cliente o fecha de alta nulos sin sumar motivos extra")
+	@DisplayName("Debe manejar correctamente cuando el cliente de la cuenta es nulo (Branch Coverage)")
 	void calcularScore_DatosClienteIncompletos_NoSumaAntiguedad() {
 		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
 
 		Cuenta cuentaSinCliente = Cuenta.builder().cliente(null).build();
 		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.of(cuentaSinCliente));
 
+		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(any(), any())).thenReturn(0L);
+		when(transaccionRepository.findPaisHabitual(any())).thenReturn(Optional.of(PAIS_HABITUAL));
+
+		ResultadoFraude resultado = calculator.calcularScore(request);
+
+		assertEquals(0.0, resultado.score(), 0.001);
+		assertTrue(resultado.motivos().isEmpty());
+	}
+
+	@Test
+	@DisplayName("Debe manejar correctamente cuando la fecha de alta del cliente es nula (Branch Coverage)")
+	void calcularScore_FechaAltaNula_NoSumaAntiguedad() {
+		TransferenciaDTO request = crearRequest(new BigDecimal("1000.00"), PAIS_HABITUAL);
+
+		Cliente clienteSinFecha = mock(Cliente.class);
+		when(clienteSinFecha.getFechaAlta()).thenReturn(null);
+		Cuenta cuenta = Cuenta.builder().cliente(clienteSinFecha).build();
+
+		when(cuentaRepository.findByNumeroCuenta(CUENTA_DESTINO)).thenReturn(Optional.of(cuenta));
 		when(transaccionRepository.countByCuentaOrigenAndFechaHoraAfter(any(), any())).thenReturn(0L);
 		when(transaccionRepository.findPaisHabitual(any())).thenReturn(Optional.of(PAIS_HABITUAL));
 
