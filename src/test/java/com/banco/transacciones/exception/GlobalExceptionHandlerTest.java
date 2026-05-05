@@ -1,7 +1,6 @@
 package com.banco.transacciones.exception;
 
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -22,6 +21,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -43,6 +44,34 @@ class GlobalExceptionHandlerTest {
 
 	private static final String VALIDATION_ERROR = "Validation Error";
 	private static final String ERROR_INTERNO = "Error interno";
+
+	/**
+	 * Verifica el manejo de la excepción unificada para recursos no encontrados. Se
+	 * utiliza un Standalone Setup con un controlador ficticio para aislar la prueba
+	 * y no depender del TestExceptionController.
+	 */
+	@Test
+	@DisplayName("Debe retornar 404 cuando no se encuentre un recurso (Cuenta, Transacción, etc)")
+	void testHandleResourceNotFound() throws Exception {
+
+		// Creamos un controlador al vuelo (Dummy) garantizando que lance la nueva
+		// excepción
+		@RestController
+		class DummyController {
+			@GetMapping("/dummy-not-found")
+			public void triggerError() {
+				throw new ResourceNotFoundException("Recurso no encontrado");
+			}
+		}
+
+		// Configuramos un MockMvc aislado solo para este test
+		MockMvc standaloneMvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+				.standaloneSetup(new DummyController()).setControllerAdvice(new GlobalExceptionHandler()).build();
+
+		// Realizamos la petición a nuestro controlador Dummy
+		standaloneMvc.perform(get("/dummy-not-found")).andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.status", is(404))).andExpect(jsonPath("$.error", is("Recurso no encontrado")));
+	}
 
 	/**
 	 * Verifica el manejo de la excepción de fondos insuficientes. Se espera un
@@ -67,18 +96,6 @@ class GlobalExceptionHandlerTest {
 	}
 
 	/**
-	 * Verifica el manejo de la excepción de transacción no encontrada. Se espera un
-	 * código HTTP 404 (Not Found).
-	 */
-	@Test
-	@DisplayName("Debe retornar 404 cuando no se encuentre la transacción buscada")
-	void testHandleTransaccionNotFound() throws Exception {
-		mockMvc.perform(get("/test/not-found")).andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.status", is(404)))
-				.andExpect(jsonPath("$.error", is("Transacción no encontrada")));
-	}
-
-	/**
 	 * Verifica el manejo de la excepción de conflicto de concurrencia o bloqueo. Se
 	 * espera un código HTTP 409 (Conflict).
 	 */
@@ -88,28 +105,6 @@ class GlobalExceptionHandlerTest {
 		mockMvc.perform(get("/test/concurrency")).andExpect(status().isConflict())
 				.andExpect(jsonPath("$.status", is(409)))
 				.andExpect(jsonPath("$.error", is("Conflicto de concurrencia")));
-	}
-
-	/**
-	 * Verifica el manejo de la excepción de cuenta no encontrada. Se espera un
-	 * código HTTP 404 (Not Found).
-	 */
-	@Test
-	@DisplayName("Debe retornar 404 cuando no se encuentre la cuenta")
-	void testHandleCuentaNotFound() throws Exception {
-		mockMvc.perform(get("/test/cuenta-not-found")).andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.status", is(404))).andExpect(jsonPath("$.error", notNullValue()));
-	}
-
-	/**
-	 * Verifica el manejo de la excepción de alerta de fraude no encontrada. Se
-	 * espera un código HTTP 404 (Not Found).
-	 */
-	@Test
-	@DisplayName("Debe retornar 404 cuando no se encuentre la alerta")
-	void testHandleAlertaNotFound() throws Exception {
-		mockMvc.perform(get("/test/alerta-not-found")).andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.status", is(404))).andExpect(jsonPath("$.error", notNullValue()));
 	}
 
 	/**

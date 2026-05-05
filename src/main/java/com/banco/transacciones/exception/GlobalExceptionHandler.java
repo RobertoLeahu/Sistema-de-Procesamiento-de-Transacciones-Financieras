@@ -29,30 +29,22 @@ public class GlobalExceptionHandler {
 
 	private static final String VALIDATION_ERROR = "Validation Error";
 	private static final String ERROR_INTERNO = "Error interno";
+	private static final String RECURSO_NO_ENCONTRADO = "Recurso no encontrado";
 
 	// ==========================================
 	// EXCEPCIONES DE NEGOCIO Y DOMINIO
 	// ==========================================
 
-	@ExceptionHandler(CuentaNotFoundException.class)
-	public ResponseEntity<ErrorResponse> handleCuentaNotFoundException(CuentaNotFoundException ex,
+	/**
+	 * Manejador unificado para cualquier recurso que no exista en la base de datos
+	 * (Cuentas, Transacciones, Alertas, etc). Evita la duplicación de código y el
+	 * antipatrón de explosión de clases.
+	 */
+	@ExceptionHandler(ResourceNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex,
 			HttpServletRequest request) {
-		log.warn("Cuenta no encontrada: {} en el path: {}", ex.getMessage(), request.getRequestURI());
-		return buildResponse(HttpStatus.NOT_FOUND, "Cuenta no encontrada", ex.getMessage(), request.getRequestURI());
-	}
-
-	@ExceptionHandler(TransaccionNotFoundException.class)
-	public ResponseEntity<ErrorResponse> handleTransaccionNotFoundException(TransaccionNotFoundException ex,
-			HttpServletRequest request) {
-		log.warn("Transacción no encontrada: {} en el path: {}", ex.getMessage(), request.getRequestURI());
-		return buildResponse(HttpStatus.NOT_FOUND, "Transacción no encontrada", ex.getMessage(),
-				request.getRequestURI());
-	}
-
-	@ExceptionHandler(AlertaNotFoundException.class)
-	public ResponseEntity<ErrorResponse> handleAlertaNotFound(AlertaNotFoundException ex, HttpServletRequest request) {
-		log.warn("Alerta no encontrada: {} en el path: {}", ex.getMessage(), request.getRequestURI());
-		return buildResponse(HttpStatus.NOT_FOUND, "Alerta no encontrada", ex.getMessage(), request.getRequestURI());
+		log.warn("Recurso no encontrado: {} en el path: {}", ex.getMessage(), request.getRequestURI());
+		return buildResponse(HttpStatus.NOT_FOUND, RECURSO_NO_ENCONTRADO, ex.getMessage(), request.getRequestURI());
 	}
 
 	@ExceptionHandler(SaldoInsuficienteException.class)
