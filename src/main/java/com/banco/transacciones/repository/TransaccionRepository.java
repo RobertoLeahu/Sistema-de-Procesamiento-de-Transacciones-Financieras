@@ -30,11 +30,9 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
 	 */
 	List<Transaccion> findByCuentaOrigenOrCuentaDestino(String cuentaOrigen, String cuentaDestino);
 
-	
 	/**
 	 * Consulta que determine cuál es el país habitual.
 	 */
-	@Query(value = "SELECT t.codigo_pais FROM transacciones t " + "WHERE t.cuenta_origen = :cuenta "
-			+ "GROUP BY t.codigo_pais " + "ORDER BY COUNT(*) DESC LIMIT 1", nativeQuery = true)
+	@Query("SELECT t.codigoPais FROM Transaccion t WHERE t.cuentaOrigen = :cuenta GROUP BY t.codigoPais ORDER BY COUNT(t.codigoPais) DESC LIMIT 1")
 	Optional<String> findPaisHabitual(@Param("cuenta") String cuenta);
 }
