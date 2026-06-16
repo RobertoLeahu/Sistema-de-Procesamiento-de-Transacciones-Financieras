@@ -583,9 +583,3 @@ curl -X POST http://localhost:8080/api/transacciones/lote \
 - No hay autenticación ni autorización implementada en la API.
 - El motor de fraude es **heurístico** y configurable; no sustituye un sistema antifraude real.
 - `CicloTransaccionDetector` y `CuentaRiesgoComparator` están implementados como utilidades pero **no se exponen** actualmente vía endpoints REST.
-
----
-
-## Licencia
-
-Este proyecto no incluye un archivo de licencia explícito. Consulta al autor o mantenedor del repositorio para condiciones de uso.
